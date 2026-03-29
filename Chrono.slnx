@@ -1,0 +1,5 @@
+<Solution>
+  <Project Path="benchmarks/Chrono.TimeSeries.Benchmark/Chrono.TimeSeries.Benchmark.csproj" />
+  <Project Path="tests/Chrono.TimeSeries.Test/Chrono.TimeSeries.Test.csproj" />
+  <Project Path="src/Chrono.TimeSeries/Chrono.TimeSeries.csproj" />
+</Solution>
