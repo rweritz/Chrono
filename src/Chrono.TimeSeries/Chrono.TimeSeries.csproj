@@ -4,4 +4,22 @@
         <Optimize>true</Optimize>
     </PropertyGroup>
 
+    <PropertyGroup>
+        <PackageId>Chrono.TimeSeries</PackageId>
+        <Version>0.1.0</Version>
+        <Authors>rweritz</Authors>
+        <Description>A high-performance time series library for .NET, built on generic math (INumber&lt;T&gt;) with SIMD-accelerated operations, multiple storage strategies, and calendar-aware aggregation.</Description>
+        <PackageLicenseExpression>MIT</PackageLicenseExpression>
+        <PackageProjectUrl>https://github.com/rweritz/Chrono</PackageProjectUrl>
+        <RepositoryUrl>https://github.com/rweritz/Chrono</RepositoryUrl>
+        <RepositoryType>git</RepositoryType>
+        <PackageTags>timeseries;time-series;numeric;math;simd;aggregation;dotnet</PackageTags>
+        <PackageReadmeFile>README.md</PackageReadmeFile>
+        <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <None Include="..\..\README.md" Pack="true" PackagePath="\" />
+    </ItemGroup>
+
 </Project>
