@@ -7,8 +7,8 @@ The `TimeSeriesMath` static class provides element-wise arithmetic between two t
 Combine two series of the same type and period, point by point:
 
 ```csharp
-var a = new RegularTimeSeries<double>(Period.Hour);
-var b = new RegularTimeSeries<double>(Period.Hour);
+var a = new FixedSlotTimeSeries<double>(Period.Hour);
+var b = new FixedSlotTimeSeries<double>(Period.Hour);
 
 var t0 = new DateTimeOffset(2024, 1, 1, 0, 0, 0, TimeSpan.Zero);
 var t1 = t0.AddHours(1);
@@ -38,7 +38,7 @@ All binary operations require both series to have the **same `Period`**. Mismatc
 Apply a scalar to every value in a series:
 
 ```csharp
-var series = new RegularTimeSeries<double>(Period.FiveMinutes);
+var series = new FixedSlotTimeSeries<double>(Period.FiveMinutes);
 var t = new DateTimeOffset(2024, 6, 1, 0, 0, 0, TimeSpan.Zero);
 series[t] = 10;
 series[t.AddMinutes(5)] = 20;
@@ -54,7 +54,7 @@ var halved   = TimeSeriesMath.Divide(series, 2.0);     // [5, 10]
 | `TimeSeriesMath.Add(series, scalar)` | Each value + scalar |
 | `TimeSeriesMath.Divide(series, scalar)` | Each value ÷ scalar |
 
-Scalar operations work on both `RegularTimeSeries<T>` and `SparseTimeSeries<T>`.
+Scalar operations work on `FixedSlotTimeSeries<T>`, `SortedArrayTimeSeries<T>`, and `DynamicSlotTimeSeries<T>`.
 
 ## Missing Value Policy
 
@@ -74,8 +74,8 @@ public enum MissingValuePolicy
 Only timestamps where **both** series have a value produce a result. Other timestamps are omitted:
 
 ```csharp
-var a = new SparseTimeSeries<double>(Period.Hour);
-var b = new SparseTimeSeries<double>(Period.Hour);
+var a = new SortedArrayTimeSeries<double>(Period.Hour);
+var b = new SortedArrayTimeSeries<double>(Period.Hour);
 
 a[t0] = 10;  a[t1] = 20;  // a has t0, t1
 b[t1] = 4;   b[t2] = 8;   // b has t1, t2
@@ -114,15 +114,15 @@ For `double` and `int` types, `TimeSeriesMath` uses hardware-accelerated SIMD (`
 
 When `Vector.IsHardwareAccelerated` is `true` (nearly all modern x64/ARM CPUs), these operations process multiple elements per instruction. The fallback loop handles remaining elements that don't fill a full SIMD width.
 
-This acceleration applies to the dense fast path in `RegularTimeSeries` (when both series are fully dense and aligned) and to scalar operations on both series types.
+This acceleration applies to the dense fast path in `FixedSlotTimeSeries` (when both series are fully dense and aligned) and to scalar operations on both series types.
 
-## Sparse Series Operations
+## SortedArray Series Operations
 
-All binary and scalar operations also work with `SparseTimeSeries<T>`:
+All binary and scalar operations also work with `SortedArrayTimeSeries<T>`:
 
 ```csharp
-var a = new SparseTimeSeries<int>(Period.FiveMinutes);
-var b = new SparseTimeSeries<int>(Period.FiveMinutes);
+var a = new SortedArrayTimeSeries<int>(Period.FiveMinutes);
+var b = new SortedArrayTimeSeries<int>(Period.FiveMinutes);
 
 a[t0] = 2;
 b[t1] = 3;

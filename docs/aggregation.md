@@ -5,7 +5,7 @@ The `TimeSeriesAggregation` static class rolls up time series data from a finer 
 ## Quick Example
 
 ```csharp
-var series = new RegularTimeSeries<int>(Period.FiveMinutes);
+var series = new FixedSlotTimeSeries<int>(Period.FiveMinutes);
 var start = new DateTimeOffset(2024, 1, 1, 0, 0, 0, TimeSpan.Zero);
 
 // 12 five-minute data points (one hour of data)
@@ -39,7 +39,7 @@ Five built-in aggregation kinds are available, each with a convenience method:
 `Min` and `Max` require the additional `IMinMaxValue<T>` constraint. All built-in numeric types (`int`, `double`, `decimal`, etc.) satisfy this:
 
 ```csharp
-var series = new SparseTimeSeries<decimal>(Period.FiveMinutes);
+var series = new SortedArrayTimeSeries<decimal>(Period.FiveMinutes);
 var start = new DateTimeOffset(2024, 1, 1, 0, 0, 0, TimeSpan.Zero);
 
 for (int i = 0; i < 12; i++)
@@ -127,26 +127,26 @@ var monthly = TimeSeriesAggregation.Sum(hourlySeries, Period.Month);
 
 ### Sparse Aggregation
 
-`SparseTimeSeries` aggregation always uses bucket flooring (either fixed or calendar). The output is a new `SparseTimeSeries`:
+`SortedArrayTimeSeries` aggregation always uses bucket flooring (either fixed or calendar). The output is a new `SortedArrayTimeSeries`:
 
 ```csharp
-var sparse = new SparseTimeSeries<double>(Period.FiveMinutes);
+var sparse = new SortedArrayTimeSeries<double>(Period.FiveMinutes);
 // ... populate ...
 
 var hourly = TimeSeriesAggregation.Sum(sparse, Period.Hour);
-// Returns SparseTimeSeries<double> with Period.Hour
+// Returns SortedArrayTimeSeries<double> with Period.Hour
 ```
 
-## RegularTimeSeries vs SparseTimeSeries Aggregation
+## FixedSlotTimeSeries vs SortedArrayTimeSeries Aggregation
 
 Both series types have full aggregation support with the same method names:
 
 ```csharp
-// RegularTimeSeries input → RegularTimeSeries output
-RegularTimeSeries<T> result = TimeSeriesAggregation.Sum(regularSeries, Period.Hour);
+// FixedSlotTimeSeries input → FixedSlotTimeSeries output
+FixedSlotTimeSeries<T> result = TimeSeriesAggregation.Sum(regularSeries, Period.Hour);
 
-// SparseTimeSeries input → SparseTimeSeries output
-SparseTimeSeries<T> result = TimeSeriesAggregation.Sum(sparseSeries, Period.Hour);
+// SortedArrayTimeSeries input → SortedArrayTimeSeries output
+SortedArrayTimeSeries<T> result = TimeSeriesAggregation.Sum(sparseSeries, Period.Hour);
 ```
 
 The return type matches the input type, so you stay in the same storage model throughout your pipeline.
@@ -156,7 +156,7 @@ The return type matches the input type, so you stay in the same storage model th
 Aggregating an empty series returns a new empty series of the target period:
 
 ```csharp
-var empty = new RegularTimeSeries<double>(Period.FiveMinutes);
+var empty = new FixedSlotTimeSeries<double>(Period.FiveMinutes);
 var result = TimeSeriesAggregation.Sum(empty, Period.Hour);
 Console.WriteLine(result.Count); // 0
 ```
@@ -166,7 +166,7 @@ Console.WriteLine(result.Count); // 0
 Aggregation only produces output buckets that contain at least one source data point. If a bucket has no source values (e.g., an hour with no 5-minute readings), it is simply absent from the result:
 
 ```csharp
-var series = new RegularTimeSeries<int>(Period.FiveMinutes);
+var series = new FixedSlotTimeSeries<int>(Period.FiveMinutes);
 series[hour0.AddMinutes(0)] = 1;
 series[hour0.AddMinutes(5)] = 2;
 // hour1 has no data

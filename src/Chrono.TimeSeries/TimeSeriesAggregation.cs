@@ -4,8 +4,8 @@ namespace Chrono.TimeSeries;
 
 public static class TimeSeriesAggregation
 {
-    public static RegularTimeSeries<TOut> Aggregate<TIn, TOut, TAggregator>(
-        RegularTimeSeries<TIn> source,
+    public static FixedSlotTimeSeries<TOut> Aggregate<TIn, TOut, TAggregator>(
+        FixedSlotTimeSeries<TIn> source,
         Period targetPeriod,
         TAggregator aggregator = default)
         where TIn : struct, INumber<TIn>
@@ -13,7 +13,7 @@ public static class TimeSeriesAggregation
         where TAggregator : struct, IAggregator<TIn, TOut>
     {
         if (source.Count == 0)
-            return new RegularTimeSeries<TOut>(targetPeriod);
+            return new FixedSlotTimeSeries<TOut>(targetPeriod);
 
         if (PeriodMath.TryGetFixedTicks(source.Period, out var sourceTicks) &&
             PeriodMath.TryGetFixedTicks(targetPeriod, out var targetTicks) &&
@@ -26,28 +26,28 @@ public static class TimeSeriesAggregation
         return AggregateCalendar<TIn, TOut, TAggregator>(source, targetPeriod, aggregator);
     }
 
-    public static RegularTimeSeries<T> Sum<T>(RegularTimeSeries<T> source, Period targetPeriod)
+    public static FixedSlotTimeSeries<T> Sum<T>(FixedSlotTimeSeries<T> source, Period targetPeriod)
         where T : struct, INumber<T>
         => Aggregate<T, T, SumAggregator<T>>(source, targetPeriod);
 
-    public static RegularTimeSeries<T> Average<T>(RegularTimeSeries<T> source, Period targetPeriod)
+    public static FixedSlotTimeSeries<T> Average<T>(FixedSlotTimeSeries<T> source, Period targetPeriod)
         where T : struct, INumber<T>
         => Aggregate<T, T, AverageAggregator<T>>(source, targetPeriod);
 
-    public static RegularTimeSeries<T> Min<T>(RegularTimeSeries<T> source, Period targetPeriod)
+    public static FixedSlotTimeSeries<T> Min<T>(FixedSlotTimeSeries<T> source, Period targetPeriod)
         where T : struct, INumber<T>, IMinMaxValue<T>
         => Aggregate<T, T, MinAggregator<T>>(source, targetPeriod);
 
-    public static RegularTimeSeries<T> Max<T>(RegularTimeSeries<T> source, Period targetPeriod)
+    public static FixedSlotTimeSeries<T> Max<T>(FixedSlotTimeSeries<T> source, Period targetPeriod)
         where T : struct, INumber<T>, IMinMaxValue<T>
         => Aggregate<T, T, MaxAggregator<T>>(source, targetPeriod);
 
-    public static RegularTimeSeries<int> Count<T>(RegularTimeSeries<T> source, Period targetPeriod)
+    public static FixedSlotTimeSeries<int> Count<T>(FixedSlotTimeSeries<T> source, Period targetPeriod)
         where T : struct, INumber<T>
         => Aggregate<T, int, CountAggregator<T>>(source, targetPeriod);
 
-    public static SparseTimeSeries<TOut> Aggregate<TIn, TOut, TAggregator>(
-        SparseTimeSeries<TIn> source,
+    public static SortedArrayTimeSeries<TOut> Aggregate<TIn, TOut, TAggregator>(
+        SortedArrayTimeSeries<TIn> source,
         Period targetPeriod,
         TAggregator aggregator = default)
         where TIn : struct, INumber<TIn>
@@ -55,7 +55,7 @@ public static class TimeSeriesAggregation
         where TAggregator : struct, IAggregator<TIn, TOut>
     {
         if (source.Count == 0)
-            return new SparseTimeSeries<TOut>(targetPeriod);
+            return new SortedArrayTimeSeries<TOut>(targetPeriod);
 
         var keys = source.TickKeys;
         var values = source.Values;
@@ -101,32 +101,77 @@ public static class TimeSeriesAggregation
         outValues[outCount] = aggregator.Complete(bucketCount);
         outCount++;
 
-        return SparseTimeSeries<TOut>.CreateFromSortedRaw(outKeys.AsSpan(0, outCount), outValues.AsSpan(0, outCount),
+        return SortedArrayTimeSeries<TOut>.CreateFromSortedRaw(outKeys.AsSpan(0, outCount), outValues.AsSpan(0, outCount),
             targetPeriod);
     }
 
-    public static SparseTimeSeries<T> Sum<T>(SparseTimeSeries<T> source, Period targetPeriod)
+    public static SortedArrayTimeSeries<T> Sum<T>(SortedArrayTimeSeries<T> source, Period targetPeriod)
         where T : struct, INumber<T>
         => Aggregate<T, T, SumAggregator<T>>(source, targetPeriod);
 
-    public static SparseTimeSeries<T> Average<T>(SparseTimeSeries<T> source, Period targetPeriod)
+    public static SortedArrayTimeSeries<T> Average<T>(SortedArrayTimeSeries<T> source, Period targetPeriod)
         where T : struct, INumber<T>
         => Aggregate<T, T, AverageAggregator<T>>(source, targetPeriod);
 
-    public static SparseTimeSeries<T> Min<T>(SparseTimeSeries<T> source, Period targetPeriod)
+    public static SortedArrayTimeSeries<T> Min<T>(SortedArrayTimeSeries<T> source, Period targetPeriod)
         where T : struct, INumber<T>, IMinMaxValue<T>
         => Aggregate<T, T, MinAggregator<T>>(source, targetPeriod);
 
-    public static SparseTimeSeries<T> Max<T>(SparseTimeSeries<T> source, Period targetPeriod)
+    public static SortedArrayTimeSeries<T> Max<T>(SortedArrayTimeSeries<T> source, Period targetPeriod)
         where T : struct, INumber<T>, IMinMaxValue<T>
         => Aggregate<T, T, MaxAggregator<T>>(source, targetPeriod);
 
-    public static SparseTimeSeries<int> Count<T>(SparseTimeSeries<T> source, Period targetPeriod)
+    public static SortedArrayTimeSeries<int> Count<T>(SortedArrayTimeSeries<T> source, Period targetPeriod)
         where T : struct, INumber<T>
         => Aggregate<T, int, CountAggregator<T>>(source, targetPeriod);
 
-    private static RegularTimeSeries<TOut> AggregateFixed<TIn, TOut, TAggregator>(
-        RegularTimeSeries<TIn> source,
+    public static DynamicSlotTimeSeries<TOut> Aggregate<TIn, TOut, TAggregator>(
+        DynamicSlotTimeSeries<TIn> source,
+        Period targetPeriod,
+        TAggregator aggregator = default)
+        where TIn : struct, INumber<TIn>
+        where TOut : struct, INumber<TOut>
+        where TAggregator : struct, IAggregator<TIn, TOut>
+    {
+        if (targetPeriod == Period.NonStandard)
+            throw new NotSupportedException($"Period {targetPeriod} is not supported.");
+
+        if (source.Count == 0)
+            return new DynamicSlotTimeSeries<TOut>(targetPeriod);
+
+        if (PeriodMath.TryGetFixedTicks(source.Period, out var sourceTicks) &&
+            PeriodMath.TryGetFixedTicks(targetPeriod, out var targetTicks) &&
+            targetTicks >= sourceTicks &&
+            targetTicks % sourceTicks == 0)
+        {
+            return AggregateFixed<TIn, TOut, TAggregator>(source, targetPeriod, sourceTicks, targetTicks, aggregator);
+        }
+
+        return AggregateCalendar<TIn, TOut, TAggregator>(source, targetPeriod, aggregator);
+    }
+
+    public static DynamicSlotTimeSeries<T> Sum<T>(DynamicSlotTimeSeries<T> source, Period targetPeriod)
+        where T : struct, INumber<T>
+        => Aggregate<T, T, SumAggregator<T>>(source, targetPeriod);
+
+    public static DynamicSlotTimeSeries<T> Average<T>(DynamicSlotTimeSeries<T> source, Period targetPeriod)
+        where T : struct, INumber<T>
+        => Aggregate<T, T, AverageAggregator<T>>(source, targetPeriod);
+
+    public static DynamicSlotTimeSeries<T> Min<T>(DynamicSlotTimeSeries<T> source, Period targetPeriod)
+        where T : struct, INumber<T>, IMinMaxValue<T>
+        => Aggregate<T, T, MinAggregator<T>>(source, targetPeriod);
+
+    public static DynamicSlotTimeSeries<T> Max<T>(DynamicSlotTimeSeries<T> source, Period targetPeriod)
+        where T : struct, INumber<T>, IMinMaxValue<T>
+        => Aggregate<T, T, MaxAggregator<T>>(source, targetPeriod);
+
+    public static DynamicSlotTimeSeries<int> Count<T>(DynamicSlotTimeSeries<T> source, Period targetPeriod)
+        where T : struct, INumber<T>
+        => Aggregate<T, int, CountAggregator<T>>(source, targetPeriod);
+
+    private static FixedSlotTimeSeries<TOut> AggregateFixed<TIn, TOut, TAggregator>(
+        FixedSlotTimeSeries<TIn> source,
         Period targetPeriod,
         long sourceTicks,
         long targetTicks,
@@ -146,7 +191,7 @@ public static class TimeSeriesAggregation
             lastBucket--;
 
         var bucketCount = checked((int)(lastBucket - firstBucket + 1));
-        var result = new RegularTimeSeries<TOut>(targetPeriod, bucketCount);
+        var result = new FixedSlotTimeSeries<TOut>(targetPeriod, bucketCount);
         result.InitializeWindow(firstBucket, bucketCount);
 
         for (var bucket = firstBucket; bucket <= lastBucket; bucket++)
@@ -180,8 +225,8 @@ public static class TimeSeriesAggregation
         return result;
     }
 
-    private static RegularTimeSeries<TOut> AggregateCalendar<TIn, TOut, TAggregator>(
-        RegularTimeSeries<TIn> source,
+    private static FixedSlotTimeSeries<TOut> AggregateCalendar<TIn, TOut, TAggregator>(
+        FixedSlotTimeSeries<TIn> source,
         Period targetPeriod,
         TAggregator aggregator)
         where TIn : struct, INumber<TIn>
@@ -203,7 +248,7 @@ public static class TimeSeriesAggregation
             temp[bucket] = state;
         }
 
-        var result = new RegularTimeSeries<TOut>(targetPeriod, temp.Count);
+        var result = new FixedSlotTimeSeries<TOut>(targetPeriod, temp.Count);
         if (temp.Count == 0)
             return result;
 
@@ -218,6 +263,103 @@ public static class TimeSeriesAggregation
         {
             var slot = PeriodMath.ToAbsoluteSlot(new DateTimeOffset(kvp.Key, TimeSpan.Zero), targetPeriod);
             var index = checked((int)(slot - firstSlot));
+            result.MutableValueSpan[index] = kvp.Value.Aggregator.Complete(kvp.Value.Count);
+            result.MarkPresentAt(index);
+        }
+
+        return result;
+    }
+
+    private static DynamicSlotTimeSeries<TOut> AggregateFixed<TIn, TOut, TAggregator>(
+        DynamicSlotTimeSeries<TIn> source,
+        Period targetPeriod,
+        long sourceTicks,
+        long targetTicks,
+        TAggregator aggregator)
+        where TIn : struct, INumber<TIn>
+        where TOut : struct, INumber<TOut>
+        where TAggregator : struct, IAggregator<TIn, TOut>
+    {
+        var factor = checked((int)(targetTicks / sourceTicks));
+        var firstBucket = Math.DivRem(source.StartSlot, factor, out var remStart);
+        if (remStart < 0)
+            firstBucket--;
+
+        var lastSourceSlot = source.StartSlot + source.SlotLength - 1;
+        var lastBucket = Math.DivRem(lastSourceSlot, factor, out var remEnd);
+        if (remEnd < 0)
+            lastBucket--;
+
+        var bucketCount = checked((int)(lastBucket - firstBucket + 1));
+        var result = new DynamicSlotTimeSeries<TOut>(targetPeriod, AlignMode.Strict, bucketCount);
+        result.InitializeWindow(firstBucket, bucketCount);
+
+        for (var bucket = firstBucket; bucket <= lastBucket; bucket++)
+        {
+            aggregator.Reset();
+            var count = 0;
+
+            var bucketStart = bucket * factor;
+            var bucketEndExclusive = bucketStart + factor;
+
+            var localStart = (int)Math.Max(0, bucketStart - source.StartSlot);
+            var localEnd = (int)Math.Min(source.SlotLength, bucketEndExclusive - source.StartSlot);
+
+            for (var i = localStart; i < localEnd; i++)
+            {
+                if (!source.TryGetSlotValue(source.StartSlot + i, out var value))
+                    continue;
+
+                aggregator.Add(value);
+                count++;
+            }
+
+            if (count == 0)
+                continue;
+
+            var idx = (int)(bucket - firstBucket);
+            result.MutableValueSpan[idx] = aggregator.Complete(count);
+            result.MarkPresentAt(idx);
+        }
+
+        return result;
+    }
+
+    private static DynamicSlotTimeSeries<TOut> AggregateCalendar<TIn, TOut, TAggregator>(
+        DynamicSlotTimeSeries<TIn> source,
+        Period targetPeriod,
+        TAggregator aggregator)
+        where TIn : struct, INumber<TIn>
+        where TOut : struct, INumber<TOut>
+        where TAggregator : struct, IAggregator<TIn, TOut>
+    {
+        var temp = new SortedDictionary<long, (TAggregator Aggregator, int Count)>();
+        foreach (var point in source)
+        {
+            var bucket = CalendarSlotMath.ToSlot(CalendarSlotMath.AlignToSlot(point.Timestamp, targetPeriod), targetPeriod);
+            if (!temp.TryGetValue(bucket, out var state))
+            {
+                state = (aggregator, 0);
+                state.Aggregator.Reset();
+            }
+
+            state.Aggregator.Add(point.Value);
+            state.Count++;
+            temp[bucket] = state;
+        }
+
+        var result = new DynamicSlotTimeSeries<TOut>(targetPeriod, AlignMode.Strict, temp.Count);
+        if (temp.Count == 0)
+            return result;
+
+        var firstSlot = temp.First().Key;
+        var lastSlot = temp.Last().Key;
+        var len = checked((int)(lastSlot - firstSlot + 1));
+        result.InitializeWindow(firstSlot, len);
+
+        foreach (var kvp in temp)
+        {
+            var index = checked((int)(kvp.Key - firstSlot));
             result.MutableValueSpan[index] = kvp.Value.Aggregator.Complete(kvp.Value.Count);
             result.MarkPresentAt(index);
         }

@@ -8,7 +8,7 @@ public class TimeSeriesAggregationTest
     public void AggregateRegular_FiveMinutesToHour_SumAverageCount_ShouldWork()
     {
         var start = new DateTimeOffset(2022, 2, 6, 0, 0, 0, TimeSpan.Zero);
-        var series = new RegularTimeSeries<int>(Period.FiveMinutes);
+        var series = new FixedSlotTimeSeries<int>(Period.FiveMinutes);
 
         for (var i = 0; i < 12; i++)
             series[start.AddMinutes(5 * i)] = i + 1;
@@ -24,10 +24,10 @@ public class TimeSeriesAggregationTest
     }
 
     [Fact]
-    public void AggregateSparse_FiveMinutesToHour_Max_ShouldWork()
+    public void AggregateSortedArray_FiveMinutesToHour_Max_ShouldWork()
     {
         var start = new DateTimeOffset(2022, 2, 6, 0, 0, 0, TimeSpan.Zero);
-        var series = new SparseTimeSeries<decimal>(Period.FiveMinutes);
+        var series = new SortedArrayTimeSeries<decimal>(Period.FiveMinutes);
 
         for (var i = 0; i < 12; i++)
             series[start.AddMinutes(5 * i)] = i + 0.5m;
