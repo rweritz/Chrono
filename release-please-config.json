@@ -1,6 +1,6 @@
 {
   "$schema": "https://raw.githubusercontent.com/googleapis/release-please/main/schemas/config.json",
-  "release-type": "dotnet",
+  "release-type": "simple",
   "packages": {
     ".": {
       "package-name": "Chrono.TimeSeries",
@@ -8,7 +8,11 @@
       "bump-minor-pre-major": true,
       "bump-patch-for-minor-pre-major": false,
       "extra-files": [
-        "src/Chrono.TimeSeries/Chrono.TimeSeries.csproj"
+        {
+          "type": "xml",
+          "path": "src/Chrono.TimeSeries/Chrono.TimeSeries.csproj",
+          "xpath": "//Project/PropertyGroup/Version"
+        }
       ]
     }
   }
