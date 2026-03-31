@@ -1,0 +1,34 @@
+#!/usr/bin/env bash
+#
+# Git commit-msg hook to validate conventional commit format.
+# Install by running: scripts/setup-hooks.sh (or scripts/setup-hooks.ps1 on Windows)
+
+commit_msg_file="$1"
+commit_msg=$(head -1 "$commit_msg_file")
+
+# Allow merge commits
+if echo "$commit_msg" | grep -qE '^Merge '; then
+    exit 0
+fi
+
+# Conventional commit pattern: type(optional-scope)!: description
+pattern='^(feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert)(\([a-zA-Z0-9_.-]+\))?(!)?: .{1,100}$'
+
+if ! echo "$commit_msg" | grep -qE "$pattern"; then
+    echo ""
+    echo "ERROR: Commit message does not follow Conventional Commits format."
+    echo ""
+    echo "Expected: <type>[optional scope]: <description>"
+    echo ""
+    echo "Types: feat, fix, docs, style, refactor, perf, test, build, ci, chore, revert"
+    echo ""
+    echo "Examples:"
+    echo "  feat: add hourly aggregation support"
+    echo "  fix(parser): handle empty time series"
+    echo "  docs: update contributing guidelines"
+    echo "  feat!: redesign storage API (BREAKING CHANGE)"
+    echo ""
+    echo "See CONTRIBUTING.md for details."
+    echo ""
+    exit 1
+fi

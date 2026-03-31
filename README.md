@@ -144,6 +144,12 @@ dotnet test tests/Chrono.TimeSeries.Test/Chrono.TimeSeries.Test.csproj
 dotnet run --project benchmarks/Chrono.TimeSeries.Benchmark/Chrono.TimeSeries.Benchmark.csproj -c Release
 ```
 
+## Contributing
+
+Contributions are welcome! Please read the [Contributing Guide](CONTRIBUTING.md) before submitting a pull request.
+
+This project uses [Conventional Commits](https://www.conventionalcommits.org/) and automated releases via [release-please](https://github.com/googleapis/release-please). PR titles must follow the conventional commit format (e.g., `feat: add new feature`, `fix: resolve bug`).
+
 ## License
 
 This project is licensed under the [MIT License](LICENSE).
