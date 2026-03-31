@@ -6,7 +6,7 @@
 
     <PropertyGroup>
         <PackageId>Chrono.TimeSeries</PackageId>
-        <Version>0.1.0</Version>
+        <Version>0.2.0</Version>
         <Authors>rweritz</Authors>
         <Description>A high-performance time series library for .NET, built on generic math (INumber&lt;T&gt;) with SIMD-accelerated operations, multiple storage strategies, and calendar-aware aggregation.</Description>
         <PackageLicenseExpression>MIT</PackageLicenseExpression>
@@ -19,7 +19,7 @@
     </PropertyGroup>
 
     <ItemGroup>
-        <None Include="..\..\README.md" Pack="true" PackagePath="\" />
+        <None Include="..\..\README.md" Pack="true" PackagePath="\"/>
     </ItemGroup>
 
 </Project>
