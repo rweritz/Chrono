@@ -6,91 +6,136 @@ public class TimeSeriesMathBenchmarks
 {
     private const int N = 10000;
 
-    private readonly RegularTimeSeries<double> _regularA;
-    private readonly RegularTimeSeries<double> _regularB;
-    private readonly SparseTimeSeries<double> _sparseA;
-    private readonly SparseTimeSeries<double> _sparseB;
+    private readonly FixedSlotTimeSeries<double> _fixedSlotA;
+    private readonly FixedSlotTimeSeries<double> _fixedSlotB;
+    private readonly SortedArrayTimeSeries<double> _sortedArrayA;
+    private readonly SortedArrayTimeSeries<double> _sortedArrayB;
+    private readonly DynamicSlotTimeSeries<double> _dynamicSlotA;
+    private readonly DynamicSlotTimeSeries<double> _dynamicSlotB;
 
     public TimeSeriesMathBenchmarks()
     {
         var start = new DateTimeOffset(2022, 2, 6, 5, 0, 0, TimeSpan.Zero);
 
-        _regularA = new RegularTimeSeries<double>(Period.FiveMinutes, N);
-        _regularB = new RegularTimeSeries<double>(Period.FiveMinutes, N);
-        _sparseA = new SparseTimeSeries<double>(Period.FiveMinutes, N);
-        _sparseB = new SparseTimeSeries<double>(Period.FiveMinutes, N);
+        _fixedSlotA = new FixedSlotTimeSeries<double>(Period.FiveMinutes, N);
+        _fixedSlotB = new FixedSlotTimeSeries<double>(Period.FiveMinutes, N);
+        _sortedArrayA = new SortedArrayTimeSeries<double>(Period.FiveMinutes, N);
+        _sortedArrayB = new SortedArrayTimeSeries<double>(Period.FiveMinutes, N);
 
         for (var i = 0; i < N; i++)
         {
             var t = start.AddMinutes(i * 5);
-            _regularA[t] = i + 1.0;
-            _regularB[t] = (i % 10) + 1.0;
-            _sparseA[t] = i + 1.0;
-            _sparseB[t] = (i % 10) + 1.0;
+            _fixedSlotA[t] = i + 1.0;
+            _fixedSlotB[t] = (i % 10) + 1.0;
+            _sortedArrayA[t] = i + 1.0;
+            _sortedArrayB[t] = (i % 10) + 1.0;
+        }
+
+        _dynamicSlotA = new DynamicSlotTimeSeries<double>(Period.Month, AlignMode.Strict, N);
+        _dynamicSlotB = new DynamicSlotTimeSeries<double>(Period.Month, AlignMode.Strict, N);
+
+        var monthStart = new DateTimeOffset(2024, 1, 1, 0, 0, 0, TimeSpan.Zero);
+        for (var i = 0; i < N; i++)
+        {
+            var t = monthStart.AddMonths(i);
+            _dynamicSlotA[t] = i + 1.0;
+            _dynamicSlotB[t] = (i % 10) + 1.0;
         }
     }
 
-    // ── Regular binary operations ────────────────────────────────────────
+    // ── FixedSlot binary operations ────────────────────────────────────────
 
     [Benchmark]
-    public RegularTimeSeries<double> RegularAdd()
-        => TimeSeriesMath.Add(_regularA, _regularB);
+    public FixedSlotTimeSeries<double> FixedSlotAdd()
+        => TimeSeriesMath.Add(_fixedSlotA, _fixedSlotB);
 
     [Benchmark]
-    public RegularTimeSeries<double> RegularSubtract()
-        => TimeSeriesMath.Subtract(_regularA, _regularB);
+    public FixedSlotTimeSeries<double> FixedSlotSubtract()
+        => TimeSeriesMath.Subtract(_fixedSlotA, _fixedSlotB);
 
     [Benchmark]
-    public RegularTimeSeries<double> RegularMultiply()
-        => TimeSeriesMath.Multiply(_regularA, _regularB);
+    public FixedSlotTimeSeries<double> FixedSlotMultiply()
+        => TimeSeriesMath.Multiply(_fixedSlotA, _fixedSlotB);
 
     [Benchmark]
-    public RegularTimeSeries<double> RegularDivide()
-        => TimeSeriesMath.Divide(_regularA, _regularB);
+    public FixedSlotTimeSeries<double> FixedSlotDivide()
+        => TimeSeriesMath.Divide(_fixedSlotA, _fixedSlotB);
 
-    // ── Regular scalar operations ────────────────────────────────────────
-
-    [Benchmark]
-    public RegularTimeSeries<double> RegularScalarAdd()
-        => TimeSeriesMath.Add(_regularA, 5.0);
+    // ── FixedSlot scalar operations ────────────────────────────────────────
 
     [Benchmark]
-    public RegularTimeSeries<double> RegularScalarMultiply()
-        => TimeSeriesMath.Multiply(_regularA, 1.5);
+    public FixedSlotTimeSeries<double> FixedSlotScalarAdd()
+        => TimeSeriesMath.Add(_fixedSlotA, 5.0);
 
     [Benchmark]
-    public RegularTimeSeries<double> RegularScalarDivide()
-        => TimeSeriesMath.Divide(_regularA, 2.0);
-
-    // ── Sparse binary operations ─────────────────────────────────────────
+    public FixedSlotTimeSeries<double> FixedSlotScalarMultiply()
+        => TimeSeriesMath.Multiply(_fixedSlotA, 1.5);
 
     [Benchmark]
-    public SparseTimeSeries<double> SparseAdd()
-        => TimeSeriesMath.Add(_sparseA, _sparseB);
+    public FixedSlotTimeSeries<double> FixedSlotScalarDivide()
+        => TimeSeriesMath.Divide(_fixedSlotA, 2.0);
+
+    // ── SortedArray binary operations ─────────────────────────────────────────
 
     [Benchmark]
-    public SparseTimeSeries<double> SparseSubtract()
-        => TimeSeriesMath.Subtract(_sparseA, _sparseB);
+    public SortedArrayTimeSeries<double> SortedArrayAdd()
+        => TimeSeriesMath.Add(_sortedArrayA, _sortedArrayB);
 
     [Benchmark]
-    public SparseTimeSeries<double> SparseMultiply()
-        => TimeSeriesMath.Multiply(_sparseA, _sparseB);
+    public SortedArrayTimeSeries<double> SortedArraySubtract()
+        => TimeSeriesMath.Subtract(_sortedArrayA, _sortedArrayB);
 
     [Benchmark]
-    public SparseTimeSeries<double> SparseDivide()
-        => TimeSeriesMath.Divide(_sparseA, _sparseB);
-
-    // ── Sparse scalar operations ─────────────────────────────────────────
+    public SortedArrayTimeSeries<double> SortedArrayMultiply()
+        => TimeSeriesMath.Multiply(_sortedArrayA, _sortedArrayB);
 
     [Benchmark]
-    public SparseTimeSeries<double> SparseScalarAdd()
-        => TimeSeriesMath.Add(_sparseA, 5.0);
+    public SortedArrayTimeSeries<double> SortedArrayDivide()
+        => TimeSeriesMath.Divide(_sortedArrayA, _sortedArrayB);
+
+    // ── SortedArray scalar operations ─────────────────────────────────────────
 
     [Benchmark]
-    public SparseTimeSeries<double> SparseScalarMultiply()
-        => TimeSeriesMath.Multiply(_sparseA, 1.5);
+    public SortedArrayTimeSeries<double> SortedArrayScalarAdd()
+        => TimeSeriesMath.Add(_sortedArrayA, 5.0);
 
     [Benchmark]
-    public SparseTimeSeries<double> SparseScalarDivide()
-        => TimeSeriesMath.Divide(_sparseA, 2.0);
+    public SortedArrayTimeSeries<double> SortedArrayScalarMultiply()
+        => TimeSeriesMath.Multiply(_sortedArrayA, 1.5);
+
+    [Benchmark]
+    public SortedArrayTimeSeries<double> SortedArrayScalarDivide()
+        => TimeSeriesMath.Divide(_sortedArrayA, 2.0);
+
+    // ── DynamicSlot binary operations ─────────────────────────────────────
+
+    [Benchmark]
+    public DynamicSlotTimeSeries<double> DynamicSlotAdd()
+        => TimeSeriesMath.Add(_dynamicSlotA, _dynamicSlotB);
+
+    [Benchmark]
+    public DynamicSlotTimeSeries<double> DynamicSlotSubtract()
+        => TimeSeriesMath.Subtract(_dynamicSlotA, _dynamicSlotB);
+
+    [Benchmark]
+    public DynamicSlotTimeSeries<double> DynamicSlotMultiply()
+        => TimeSeriesMath.Multiply(_dynamicSlotA, _dynamicSlotB);
+
+    [Benchmark]
+    public DynamicSlotTimeSeries<double> DynamicSlotDivide()
+        => TimeSeriesMath.Divide(_dynamicSlotA, _dynamicSlotB);
+
+    // ── DynamicSlot scalar operations ─────────────────────────────────────
+
+    [Benchmark]
+    public DynamicSlotTimeSeries<double> DynamicSlotScalarAdd()
+        => TimeSeriesMath.Add(_dynamicSlotA, 5.0);
+
+    [Benchmark]
+    public DynamicSlotTimeSeries<double> DynamicSlotScalarMultiply()
+        => TimeSeriesMath.Multiply(_dynamicSlotA, 1.5);
+
+    [Benchmark]
+    public DynamicSlotTimeSeries<double> DynamicSlotScalarDivide()
+        => TimeSeriesMath.Divide(_dynamicSlotA, 2.0);
 }

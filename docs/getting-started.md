@@ -25,7 +25,7 @@ using Chrono.TimeSeries;
 
 ```csharp
 // A 5-minute interval series of doubles
-var series = new RegularTimeSeries<double>(Period.FiveMinutes);
+var series = new FixedSlotTimeSeries<double>(Period.FiveMinutes);
 
 var start = new DateTimeOffset(2024, 1, 1, 0, 0, 0, TimeSpan.Zero);
 series[start] = 10.0;

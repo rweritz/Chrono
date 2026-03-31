@@ -40,7 +40,7 @@ These periods have a constant duration in ticks and support O(1) slot indexing:
 | `Day` | 24 hours |
 | `Week` | 7 days |
 
-These are the only periods supported by `RegularTimeSeries<T>`.
+These are the only periods supported by `FixedSlotTimeSeries<T>`.
 
 ### Calendar-Length Periods
 
@@ -53,13 +53,13 @@ These periods have variable durations (e.g., months have 28–31 days) and are h
 | `HalfYear` | Jan 1 or Jul 1 |
 | `Year` | Jan 1 |
 
-Calendar periods are supported by `SparseTimeSeries<T>` and as aggregation targets.
+Calendar periods are supported by `SortedArrayTimeSeries<T>` and as aggregation targets.
 
 ## Timestamp Alignment
 
-### For RegularTimeSeries
+### For FixedSlotTimeSeries
 
-`RegularTimeSeries` computes an **absolute slot index** from each timestamp using:
+`FixedSlotTimeSeries` computes an **absolute slot index** from each timestamp using:
 
 ```
 slot = (timestamp.UtcTicks - anchor) / stepTicks
@@ -70,7 +70,7 @@ Where `anchor` is the Unix epoch (or January 5, 1970 for weekly alignment to Mon
 This means timestamps must be exactly aligned to the period grid:
 
 ```csharp
-var series = new RegularTimeSeries<double>(Period.Hour);
+var series = new FixedSlotTimeSeries<double>(Period.Hour);
 
 // ✅ Aligned to the hour
 series[new DateTimeOffset(2024, 1, 1, 12, 0, 0, TimeSpan.Zero)] = 1.0;
@@ -79,9 +79,9 @@ series[new DateTimeOffset(2024, 1, 1, 12, 0, 0, TimeSpan.Zero)] = 1.0;
 series[new DateTimeOffset(2024, 1, 1, 12, 30, 0, TimeSpan.Zero)] = 2.0;
 ```
 
-### For SparseTimeSeries
+### For SortedArrayTimeSeries
 
-`SparseTimeSeries` uses a **reference-based validation** approach. The first timestamp inserted becomes the reference, and all subsequent timestamps must have matching sub-period components.
+`SortedArrayTimeSeries` uses a **reference-based validation** approach. The first timestamp inserted becomes the reference, and all subsequent timestamps must have matching sub-period components.
 
 For example, with `Period.FiveMinutes`:
 - Reference: `2024-01-01T00:06:07.008+01:00`
@@ -104,7 +104,7 @@ The `PeriodConverter` class provides validation functions for sub-daily periods:
 | `HalfHour` | `minute % 30` matches reference, sub-minute components match |
 | `Hour` | All sub-hour components match reference |
 
-Periods from `HalfDay` and above don't have reference-based validation in `PeriodConverter` — they rely on the slot alignment math in `RegularTimeSeries` or the calendar floor logic for aggregation.
+`SortedArrayTimeSeries` uses reference-based period validation for all non-`NonStandard` periods.
 
 ## Bucket Flooring for Aggregation
 

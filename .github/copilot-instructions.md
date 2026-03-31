@@ -27,12 +27,12 @@ Two implementations exist, both in `Chrono.TimeSeries`:
 
 | Class | Backend | Notes |
 |---|---|---|
-| `SparseTimeSeries<T>` | Sorted parallel arrays (`long[]` keys + `T[]` values) | General-purpose sparse/irregular storage with binary-search lookup |
-| `RegularTimeSeries<T>` | Fixed-step slot array + presence bitset | Fast path for fixed-tick periods with O(1) slot addressing |
+| `SortedArrayTimeSeries<T>` | Sorted parallel arrays (`long[]` keys + `T[]` values) | General-purpose sparse/irregular storage with binary-search lookup |
+| `FixedSlotTimeSeries<T>` | Fixed-step slot array + presence bitset | Fast path for fixed-tick periods with O(1) slot addressing |
 
 **Period validation** — every implementation validates that inserted `DateTimeOffset` values align with the first-inserted value according to the `Period` enum (e.g. `FiveMinutes` requires `minute % 5 == reference.minute % 5`). Sub-minute components (second, ms, µs, ns) must also match. This logic lives in `PeriodConverter`.
 
-**Benchmark focus** — current benchmark coverage compares `SparseTimeSeries<double>` and `RegularTimeSeries<double>` in ordered insert, ordered access, and scalar multiply scenarios.
+**Benchmark focus** — current benchmark coverage compares `SortedArrayTimeSeries<double>` and `FixedSlotTimeSeries<double>` in ordered insert, ordered access, and scalar multiply scenarios.
 
 ## Conventions
 

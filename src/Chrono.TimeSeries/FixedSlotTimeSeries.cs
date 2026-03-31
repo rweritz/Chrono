@@ -3,7 +3,7 @@ using System.Numerics;
 
 namespace Chrono.TimeSeries;
 
-public sealed class RegularTimeSeries<T> : ITimeSeries<T>
+public sealed class FixedSlotTimeSeries<T> : ITimeSeries<T>
     where T : struct, INumber<T>
 {
     private readonly long _stepTicks;
@@ -13,10 +13,10 @@ public sealed class RegularTimeSeries<T> : ITimeSeries<T>
     private T[] _values;
     private ulong[] _presentBits;
 
-    public RegularTimeSeries(Period period, int capacity = 0)
+    public FixedSlotTimeSeries(Period period, int capacity = 0)
     {
         if (!PeriodMath.TryGetFixedTicks(period, out _stepTicks))
-            throw new NotSupportedException($"Use SparseTimeSeries for period {period}.");
+            throw new NotSupportedException($"Use SortedArrayTimeSeries for period {period}.");
 
         Period = period;
         _values = capacity == 0 ? Array.Empty<T>() : GC.AllocateUninitializedArray<T>(capacity);

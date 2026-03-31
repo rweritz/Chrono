@@ -5,9 +5,9 @@ namespace Chrono.TimeSeries;
 
 public static class TimeSeriesMath
 {
-    public static RegularTimeSeries<T> Add<T>(
-        RegularTimeSeries<T> left,
-        RegularTimeSeries<T> right,
+    public static FixedSlotTimeSeries<T> Add<T>(
+        FixedSlotTimeSeries<T> left,
+        FixedSlotTimeSeries<T> right,
         MissingValuePolicy policy = MissingValuePolicy.Intersection)
         where T : struct, INumber<T>
     {
@@ -18,7 +18,7 @@ public static class TimeSeriesMath
             left.StartSlot == right.StartSlot &&
             left.SlotLength == right.SlotLength)
         {
-            var result = new RegularTimeSeries<T>(left.Period, left.SlotLength);
+            var result = new FixedSlotTimeSeries<T>(left.Period, left.SlotLength);
             result.InitializeWindow(left.StartSlot, left.SlotLength);
             AddDense(left.ValueSpan, right.ValueSpan, result.MutableValueSpan);
             for (var i = 0; i < left.SlotLength; i++)
@@ -29,9 +29,9 @@ public static class TimeSeriesMath
         return MergeRegular(left, right, policy, static (a, b) => a + b);
     }
 
-    public static RegularTimeSeries<T> Subtract<T>(
-        RegularTimeSeries<T> left,
-        RegularTimeSeries<T> right,
+    public static FixedSlotTimeSeries<T> Subtract<T>(
+        FixedSlotTimeSeries<T> left,
+        FixedSlotTimeSeries<T> right,
         MissingValuePolicy policy = MissingValuePolicy.Intersection)
         where T : struct, INumber<T>
     {
@@ -39,9 +39,9 @@ public static class TimeSeriesMath
         return MergeRegular(left, right, policy, static (a, b) => a - b);
     }
 
-    public static RegularTimeSeries<T> Multiply<T>(
-        RegularTimeSeries<T> left,
-        RegularTimeSeries<T> right,
+    public static FixedSlotTimeSeries<T> Multiply<T>(
+        FixedSlotTimeSeries<T> left,
+        FixedSlotTimeSeries<T> right,
         MissingValuePolicy policy = MissingValuePolicy.Intersection)
         where T : struct, INumber<T>
     {
@@ -49,9 +49,9 @@ public static class TimeSeriesMath
         return MergeRegular(left, right, policy, static (a, b) => a * b);
     }
 
-    public static RegularTimeSeries<T> Divide<T>(
-        RegularTimeSeries<T> left,
-        RegularTimeSeries<T> right,
+    public static FixedSlotTimeSeries<T> Divide<T>(
+        FixedSlotTimeSeries<T> left,
+        FixedSlotTimeSeries<T> right,
         MissingValuePolicy policy = MissingValuePolicy.Intersection)
         where T : struct, INumber<T>
     {
@@ -59,10 +59,10 @@ public static class TimeSeriesMath
         return MergeRegular(left, right, policy, static (a, b) => a / b);
     }
 
-    public static RegularTimeSeries<T> Multiply<T>(RegularTimeSeries<T> input, T scalar)
+    public static FixedSlotTimeSeries<T> Multiply<T>(FixedSlotTimeSeries<T> input, T scalar)
         where T : struct, INumber<T>
     {
-        var result = new RegularTimeSeries<T>(input.Period, input.SlotLength);
+        var result = new FixedSlotTimeSeries<T>(input.Period, input.SlotLength);
         result.InitializeWindow(input.StartSlot, input.SlotLength);
         MultiplyDense(input.ValueSpan, scalar, result.MutableValueSpan);
 
@@ -73,10 +73,10 @@ public static class TimeSeriesMath
         return result;
     }
 
-    public static RegularTimeSeries<T> Add<T>(RegularTimeSeries<T> input, T scalar)
+    public static FixedSlotTimeSeries<T> Add<T>(FixedSlotTimeSeries<T> input, T scalar)
         where T : struct, INumber<T>
     {
-        var result = new RegularTimeSeries<T>(input.Period, input.SlotLength);
+        var result = new FixedSlotTimeSeries<T>(input.Period, input.SlotLength);
         result.InitializeWindow(input.StartSlot, input.SlotLength);
         AddScalarDense(input.ValueSpan, scalar, result.MutableValueSpan);
 
@@ -87,10 +87,10 @@ public static class TimeSeriesMath
         return result;
     }
 
-    public static RegularTimeSeries<T> Divide<T>(RegularTimeSeries<T> input, T scalar)
+    public static FixedSlotTimeSeries<T> Divide<T>(FixedSlotTimeSeries<T> input, T scalar)
         where T : struct, INumber<T>
     {
-        var result = new RegularTimeSeries<T>(input.Period, input.SlotLength);
+        var result = new FixedSlotTimeSeries<T>(input.Period, input.SlotLength);
         result.InitializeWindow(input.StartSlot, input.SlotLength);
         DivideDense(input.ValueSpan, scalar, result.MutableValueSpan);
 
@@ -101,35 +101,143 @@ public static class TimeSeriesMath
         return result;
     }
 
-    public static SparseTimeSeries<T> Add<T>(
-        SparseTimeSeries<T> left,
-        SparseTimeSeries<T> right,
+    public static DynamicSlotTimeSeries<T> Add<T>(
+        DynamicSlotTimeSeries<T> left,
+        DynamicSlotTimeSeries<T> right,
         MissingValuePolicy policy = MissingValuePolicy.Intersection)
         where T : struct, INumber<T>
-        => MergeSparse(left, right, policy, static (a, b) => a + b);
+    {
+        EnsureCompatible(left, right);
 
-    public static SparseTimeSeries<T> Subtract<T>(
-        SparseTimeSeries<T> left,
-        SparseTimeSeries<T> right,
+        if (policy == MissingValuePolicy.Intersection &&
+            left.IsDense && right.IsDense &&
+            left.StartSlot == right.StartSlot &&
+            left.SlotLength == right.SlotLength)
+        {
+            var result = new DynamicSlotTimeSeries<T>(left.Period, AlignMode.Strict, left.SlotLength);
+            result.InitializeWindow(left.StartSlot, left.SlotLength);
+            AddDense(left.ValueSpan, right.ValueSpan, result.MutableValueSpan);
+            for (var i = 0; i < left.SlotLength; i++)
+                result.MarkPresentAt(i);
+            return result;
+        }
+
+        return MergeCalendar(left, right, policy, static (a, b) => a + b);
+    }
+
+    public static DynamicSlotTimeSeries<T> Subtract<T>(
+        DynamicSlotTimeSeries<T> left,
+        DynamicSlotTimeSeries<T> right,
         MissingValuePolicy policy = MissingValuePolicy.Intersection)
         where T : struct, INumber<T>
-        => MergeSparse(left, right, policy, static (a, b) => a - b);
+    {
+        EnsureCompatible(left, right);
+        return MergeCalendar(left, right, policy, static (a, b) => a - b);
+    }
 
-    public static SparseTimeSeries<T> Multiply<T>(
-        SparseTimeSeries<T> left,
-        SparseTimeSeries<T> right,
+    public static DynamicSlotTimeSeries<T> Multiply<T>(
+        DynamicSlotTimeSeries<T> left,
+        DynamicSlotTimeSeries<T> right,
         MissingValuePolicy policy = MissingValuePolicy.Intersection)
         where T : struct, INumber<T>
-        => MergeSparse(left, right, policy, static (a, b) => a * b);
+    {
+        EnsureCompatible(left, right);
+        return MergeCalendar(left, right, policy, static (a, b) => a * b);
+    }
 
-    public static SparseTimeSeries<T> Divide<T>(
-        SparseTimeSeries<T> left,
-        SparseTimeSeries<T> right,
+    public static DynamicSlotTimeSeries<T> Divide<T>(
+        DynamicSlotTimeSeries<T> left,
+        DynamicSlotTimeSeries<T> right,
         MissingValuePolicy policy = MissingValuePolicy.Intersection)
         where T : struct, INumber<T>
-        => MergeSparse(left, right, policy, static (a, b) => a / b);
+    {
+        EnsureCompatible(left, right);
+        return MergeCalendar(left, right, policy, static (a, b) => a / b);
+    }
 
-    public static SparseTimeSeries<T> Multiply<T>(SparseTimeSeries<T> source, T scalar)
+    public static DynamicSlotTimeSeries<T> Multiply<T>(DynamicSlotTimeSeries<T> input, T scalar)
+        where T : struct, INumber<T>
+    {
+        var result = new DynamicSlotTimeSeries<T>(input.Period, AlignMode.Strict, input.SlotLength);
+        result.InitializeWindow(input.StartSlot, input.SlotLength);
+        MultiplyDense(input.ValueSpan, scalar, result.MutableValueSpan);
+
+        for (var i = 0; i < input.SlotLength; i++)
+            if (input.TryGetSlotValue(input.StartSlot + i, out _))
+                result.MarkPresentAt(i);
+
+        return result;
+    }
+
+    public static DynamicSlotTimeSeries<T> Add<T>(DynamicSlotTimeSeries<T> input, T scalar)
+        where T : struct, INumber<T>
+    {
+        var result = new DynamicSlotTimeSeries<T>(input.Period, AlignMode.Strict, input.SlotLength);
+        result.InitializeWindow(input.StartSlot, input.SlotLength);
+        AddScalarDense(input.ValueSpan, scalar, result.MutableValueSpan);
+
+        for (var i = 0; i < input.SlotLength; i++)
+            if (input.TryGetSlotValue(input.StartSlot + i, out _))
+                result.MarkPresentAt(i);
+
+        return result;
+    }
+
+    public static DynamicSlotTimeSeries<T> Divide<T>(DynamicSlotTimeSeries<T> input, T scalar)
+        where T : struct, INumber<T>
+    {
+        var result = new DynamicSlotTimeSeries<T>(input.Period, AlignMode.Strict, input.SlotLength);
+        result.InitializeWindow(input.StartSlot, input.SlotLength);
+        DivideDense(input.ValueSpan, scalar, result.MutableValueSpan);
+
+        for (var i = 0; i < input.SlotLength; i++)
+            if (input.TryGetSlotValue(input.StartSlot + i, out _))
+                result.MarkPresentAt(i);
+
+        return result;
+    }
+
+    public static SortedArrayTimeSeries<T> Add<T>(
+        SortedArrayTimeSeries<T> left,
+        SortedArrayTimeSeries<T> right,
+        MissingValuePolicy policy = MissingValuePolicy.Intersection)
+        where T : struct, INumber<T>
+    {
+        EnsureCompatible(left, right);
+        return MergeSparse(left, right, policy, static (a, b) => a + b);
+    }
+
+    public static SortedArrayTimeSeries<T> Subtract<T>(
+        SortedArrayTimeSeries<T> left,
+        SortedArrayTimeSeries<T> right,
+        MissingValuePolicy policy = MissingValuePolicy.Intersection)
+        where T : struct, INumber<T>
+    {
+        EnsureCompatible(left, right);
+        return MergeSparse(left, right, policy, static (a, b) => a - b);
+    }
+
+    public static SortedArrayTimeSeries<T> Multiply<T>(
+        SortedArrayTimeSeries<T> left,
+        SortedArrayTimeSeries<T> right,
+        MissingValuePolicy policy = MissingValuePolicy.Intersection)
+        where T : struct, INumber<T>
+    {
+        EnsureCompatible(left, right);
+        return MergeSparse(left, right, policy, static (a, b) => a * b);
+    }
+
+    public static SortedArrayTimeSeries<T> Divide<T>(
+        SortedArrayTimeSeries<T> left,
+        SortedArrayTimeSeries<T> right,
+        MissingValuePolicy policy = MissingValuePolicy.Intersection)
+        where T : struct, INumber<T>
+    {
+        EnsureCompatible(left, right);
+        return MergeSparse(left, right, policy, static (a, b) => a / b);
+    }
+
+    public static SortedArrayTimeSeries<T> Multiply<T>(SortedArrayTimeSeries<T> source, T scalar)
         where T : struct, INumber<T>
     {
         var keys = source.TickKeys;
@@ -138,10 +246,10 @@ public static class TimeSeriesMath
         var outValues = new T[values.Length];
 
         MultiplyDense(values, scalar, outValues);
-        return SparseTimeSeries<T>.CreateFromSortedRaw(outKeys, outValues, source.Period);
+        return SortedArrayTimeSeries<T>.CreateFromSortedRaw(outKeys, outValues, source.Period);
     }
 
-    public static SparseTimeSeries<T> Add<T>(SparseTimeSeries<T> source, T scalar)
+    public static SortedArrayTimeSeries<T> Add<T>(SortedArrayTimeSeries<T> source, T scalar)
         where T : struct, INumber<T>
     {
         var keys = source.TickKeys;
@@ -150,10 +258,10 @@ public static class TimeSeriesMath
         var outValues = new T[values.Length];
 
         AddScalarDense(values, scalar, outValues);
-        return SparseTimeSeries<T>.CreateFromSortedRaw(outKeys, outValues, source.Period);
+        return SortedArrayTimeSeries<T>.CreateFromSortedRaw(outKeys, outValues, source.Period);
     }
 
-    public static SparseTimeSeries<T> Divide<T>(SparseTimeSeries<T> source, T scalar)
+    public static SortedArrayTimeSeries<T> Divide<T>(SortedArrayTimeSeries<T> source, T scalar)
         where T : struct, INumber<T>
     {
         var keys = source.TickKeys;
@@ -162,12 +270,12 @@ public static class TimeSeriesMath
         var outValues = new T[values.Length];
 
         DivideDense(values, scalar, outValues);
-        return SparseTimeSeries<T>.CreateFromSortedRaw(outKeys, outValues, source.Period);
+        return SortedArrayTimeSeries<T>.CreateFromSortedRaw(outKeys, outValues, source.Period);
     }
 
-    private static RegularTimeSeries<T> MergeRegular<T>(
-        RegularTimeSeries<T> left,
-        RegularTimeSeries<T> right,
+    private static FixedSlotTimeSeries<T> MergeRegular<T>(
+        FixedSlotTimeSeries<T> left,
+        FixedSlotTimeSeries<T> right,
         MissingValuePolicy policy,
         Func<T, T, T> op)
         where T : struct, INumber<T>
@@ -181,9 +289,9 @@ public static class TimeSeriesMath
             : Math.Max(left.StartSlot + left.SlotLength, right.StartSlot + right.SlotLength);
 
         if (endExclusive <= start)
-            return new RegularTimeSeries<T>(left.Period);
+            return new FixedSlotTimeSeries<T>(left.Period);
 
-        var result = new RegularTimeSeries<T>(left.Period, checked((int)(endExclusive - start)));
+        var result = new FixedSlotTimeSeries<T>(left.Period, checked((int)(endExclusive - start)));
         result.InitializeWindow(start, checked((int)(endExclusive - start)));
 
         for (var slot = start; slot < endExclusive; slot++)
@@ -209,9 +317,9 @@ public static class TimeSeriesMath
         return result;
     }
 
-    private static SparseTimeSeries<T> MergeSparse<T>(
-        SparseTimeSeries<T> left,
-        SparseTimeSeries<T> right,
+    private static SortedArrayTimeSeries<T> MergeSparse<T>(
+        SortedArrayTimeSeries<T> left,
+        SortedArrayTimeSeries<T> right,
         MissingValuePolicy policy,
         Func<T, T, T> op)
         where T : struct, INumber<T>
@@ -295,7 +403,51 @@ public static class TimeSeriesMath
             }
         }
 
-        return SparseTimeSeries<T>.CreateFromSortedRaw(outK.AsSpan(0, n), outV.AsSpan(0, n), left.Period);
+        return SortedArrayTimeSeries<T>.CreateFromSortedRaw(outK.AsSpan(0, n), outV.AsSpan(0, n), left.Period);
+    }
+
+    private static DynamicSlotTimeSeries<T> MergeCalendar<T>(
+        DynamicSlotTimeSeries<T> left,
+        DynamicSlotTimeSeries<T> right,
+        MissingValuePolicy policy,
+        Func<T, T, T> op)
+        where T : struct, INumber<T>
+    {
+        var start = policy == MissingValuePolicy.Intersection
+            ? Math.Max(left.StartSlot, right.StartSlot)
+            : Math.Min(left.StartSlot, right.StartSlot);
+
+        var endExclusive = policy == MissingValuePolicy.Intersection
+            ? Math.Min(left.StartSlot + left.SlotLength, right.StartSlot + right.SlotLength)
+            : Math.Max(left.StartSlot + left.SlotLength, right.StartSlot + right.SlotLength);
+
+        if (endExclusive <= start)
+            return new DynamicSlotTimeSeries<T>(left.Period);
+
+        var result = new DynamicSlotTimeSeries<T>(left.Period, AlignMode.Strict, checked((int)(endExclusive - start)));
+        result.InitializeWindow(start, checked((int)(endExclusive - start)));
+
+        for (var slot = start; slot < endExclusive; slot++)
+        {
+            var hasLeft = left.TryGetSlotValue(slot, out var lv);
+            var hasRight = right.TryGetSlotValue(slot, out var rv);
+
+            switch (policy)
+            {
+                case MissingValuePolicy.Throw when hasLeft != hasRight:
+                    throw new InvalidOperationException($"Missing value at slot {slot}.");
+                case MissingValuePolicy.Intersection when !(hasLeft && hasRight):
+                    continue;
+                case MissingValuePolicy.UnionWithZero when !(hasLeft || hasRight):
+                    continue;
+            }
+
+            var index = checked((int)(slot - start));
+            result.MutableValueSpan[index] = op(hasLeft ? lv : T.Zero, hasRight ? rv : T.Zero);
+            result.MarkPresentAt(index);
+        }
+
+        return result;
     }
 
     private static void AddDense<T>(ReadOnlySpan<T> left, ReadOnlySpan<T> right, Span<T> destination)
@@ -434,7 +586,21 @@ public static class TimeSeriesMath
             destination[i] = input[i] * scalar;
     }
 
-    private static void EnsureCompatible<T>(RegularTimeSeries<T> left, RegularTimeSeries<T> right)
+    private static void EnsureCompatible<T>(FixedSlotTimeSeries<T> left, FixedSlotTimeSeries<T> right)
+        where T : struct, INumber<T>
+    {
+        if (left.Period != right.Period)
+            throw new InvalidOperationException("Series periods must match.");
+    }
+
+    private static void EnsureCompatible<T>(DynamicSlotTimeSeries<T> left, DynamicSlotTimeSeries<T> right)
+        where T : struct, INumber<T>
+    {
+        if (left.Period != right.Period)
+            throw new InvalidOperationException("Series periods must match.");
+    }
+
+    private static void EnsureCompatible<T>(SortedArrayTimeSeries<T> left, SortedArrayTimeSeries<T> right)
         where T : struct, INumber<T>
     {
         if (left.Period != right.Period)

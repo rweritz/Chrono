@@ -5,14 +5,14 @@ namespace Chrono.TimeSeries.Test;
 public class TimeSeriesMathTest
 {
     [Fact]
-    public void Sparse_Add_Subtract_Multiply_Divide_ShouldWorkWithIntersection()
+    public void SortedArray_Add_Subtract_Multiply_Divide_ShouldWorkWithIntersection()
     {
         var t0 = new DateTimeOffset(2022, 2, 6, 5, 6, 7, 8, TimeSpan.FromHours(1));
         var t1 = t0.AddMinutes(5);
         var t2 = t1.AddMinutes(5);
 
-        var a = new SparseTimeSeries<double>(Period.FiveMinutes);
-        var b = new SparseTimeSeries<double>(Period.FiveMinutes);
+        var a = new SortedArrayTimeSeries<double>(Period.FiveMinutes);
+        var b = new SortedArrayTimeSeries<double>(Period.FiveMinutes);
 
         a[t0] = 10;
         a[t1] = 20;
@@ -32,13 +32,13 @@ public class TimeSeriesMathTest
     }
 
     [Fact]
-    public void Sparse_UnionWithZero_ShouldIncludeAllKeys()
+    public void SortedArray_UnionWithZero_ShouldIncludeAllKeys()
     {
         var t0 = new DateTimeOffset(2022, 2, 6, 5, 6, 7, 8, TimeSpan.FromHours(1));
         var t1 = t0.AddMinutes(5);
 
-        var a = new SparseTimeSeries<int>(Period.FiveMinutes);
-        var b = new SparseTimeSeries<int>(Period.FiveMinutes);
+        var a = new SortedArrayTimeSeries<int>(Period.FiveMinutes);
+        var b = new SortedArrayTimeSeries<int>(Period.FiveMinutes);
 
         a[t0] = 2;
         b[t1] = 3;
@@ -56,7 +56,7 @@ public class TimeSeriesMathTest
         var t0 = new DateTimeOffset(2022, 2, 6, 5, 6, 7, 8, TimeSpan.FromHours(1));
         var t1 = t0.AddMinutes(5);
 
-        var source = new SparseTimeSeries<decimal>(Period.FiveMinutes);
+        var source = new SortedArrayTimeSeries<decimal>(Period.FiveMinutes);
         source[t0] = 2m;
         source[t1] = 8m;
 
@@ -75,8 +75,8 @@ public class TimeSeriesMathTest
     {
         var start = new DateTimeOffset(2022, 2, 6, 5, 0, 0, TimeSpan.Zero);
 
-        var a = new RegularTimeSeries<double>(Period.FiveMinutes);
-        var b = new RegularTimeSeries<double>(Period.FiveMinutes);
+        var a = new FixedSlotTimeSeries<double>(Period.FiveMinutes);
+        var b = new FixedSlotTimeSeries<double>(Period.FiveMinutes);
 
         a[start] = 1;
         a[start.AddMinutes(5)] = 2;

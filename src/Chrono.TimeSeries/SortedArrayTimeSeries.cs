@@ -3,7 +3,7 @@ using System.Numerics;
 
 namespace Chrono.TimeSeries;
 
-public class SparseTimeSeries<T> : ITimeSeries<T>
+public class SortedArrayTimeSeries<T> : ITimeSeries<T>
     where T : struct, INumber<T>
 {
     private long[] _keys;
@@ -15,14 +15,14 @@ public class SparseTimeSeries<T> : ITimeSeries<T>
 
     private const int DefaultCapacity = 16;
 
-    public SparseTimeSeries(Period period, int capacity = DefaultCapacity)
+    public SortedArrayTimeSeries(Period period, int capacity = DefaultCapacity)
     {
         Period = period;
         _keys = new long[Math.Max(0, capacity)];
         _values = new T[Math.Max(0, capacity)];
 
         if (period != Period.NonStandard)
-            _validationFunc = PeriodConverter.GetValidationFunc(period);
+            _validationFunc = (timestamp, reference) => ReferencePeriodValidator.IsAligned(period, timestamp, reference);
     }
 
     public Period Period { get; }
@@ -115,12 +115,12 @@ public class SparseTimeSeries<T> : ITimeSeries<T>
 
     IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
 
-    internal static SparseTimeSeries<T> CreateFromSortedRaw(ReadOnlySpan<long> keys, ReadOnlySpan<T> values, Period period)
+    internal static SortedArrayTimeSeries<T> CreateFromSortedRaw(ReadOnlySpan<long> keys, ReadOnlySpan<T> values, Period period)
     {
         if (keys.Length != values.Length)
             throw new ArgumentException("keys and values length mismatch");
 
-        var ts = new SparseTimeSeries<T>(period, keys.Length)
+        var ts = new SortedArrayTimeSeries<T>(period, keys.Length)
         {
             _count = keys.Length
         };
