@@ -38,18 +38,18 @@ var scaled = TimeSeriesMath.Multiply(series, 2.0);
 
 ## Documentation
 
-For detailed guides and API explanations, see the [**full documentation**](docs/index.md):
+For detailed guides and API explanations, see the [**full documentation**](docs/users/index.md):
 
-- [Getting Started](docs/getting-started.md) — installation & first time series
-- [Time Series Types](docs/time-series-types.md) — `FixedSlotTimeSeries<T>`, `SortedArrayTimeSeries<T>`, `DynamicSlotTimeSeries<T>`
-- [Periods & Alignment](docs/periods-and-alignment.md) — period enum, validation, and slot math
-- [Arithmetic Operations](docs/arithmetic-operations.md) — binary & scalar math, missing value policies
-- [Aggregation](docs/aggregation.md) — Sum, Average, Min, Max, Count across time buckets
-- [Benchmarks](docs/benchmarks.md) — performance characteristics and results
+- [Getting Started](docs/users/getting-started.md) — installation & first time series
+- [Time Series Types](docs/users/time-series-types.md) — `FixedSlotTimeSeries<T>`, `SortedArrayTimeSeries<T>`, `DynamicSlotTimeSeries<T>`
+- [Periods & Alignment](docs/users/periods-and-alignment.md) — period enum, validation, and slot math
+- [Arithmetic Operations](docs/users/arithmetic-operations.md) — binary & scalar math, missing value policies
+- [Aggregation](docs/users/aggregation.md) — Sum, Average, Min, Max, Count across time buckets
+- [Benchmarks](docs/users/benchmarks.md) — performance characteristics and results
 
 ## Benchmarks
 
-Measured with [BenchmarkDotNet](https://github.com/dotnet/BenchmarkDotNet) on .NET 10.0, N = 10,000 data points (`double` series). See the [full benchmark analysis](docs/benchmarks.md) for details.
+Measured with [BenchmarkDotNet](https://github.com/dotnet/BenchmarkDotNet) on .NET 10.0, N = 10,000 data points (`double` series). See the [full benchmark analysis](docs/users/benchmarks.md) for details.
 
 ```
 BenchmarkDotNet v0.13.12, Windows 11 (10.0.26200.8037)
