@@ -17,7 +17,7 @@ public class TimeSeriesAggregationTest
         var avg = TimeSeriesAggregation.Average(series, Period.Hour);
         var cnt = TimeSeriesAggregation.Count(series, Period.Hour);
 
-        sum.Count.Should().Be(1);
+        sum.ExplicitPointCount.Should().Be(1);
         sum[start].Should().Be(78);
         avg[start].Should().Be(6);
         cnt[start].Should().Be(12);
@@ -34,7 +34,45 @@ public class TimeSeriesAggregationTest
 
         var max = TimeSeriesAggregation.Max(series, Period.Hour);
 
-        max.Count.Should().Be(1);
+        max.ExplicitPointCount.Should().Be(1);
         max[start].Should().Be(11.5m);
+    }
+
+    [Fact]
+    public void SparseFamilyAggregation_ShouldAggregateOnlyExplicitPointsThroughSparseContract()
+    {
+        var start = new DateTimeOffset(2024, 1, 1, 0, 0, 0, TimeSpan.Zero);
+        var middle = start.AddMinutes(30);
+        var series = new DynamicSlotTimeSeries<int>(Period.FiveMinutes);
+        IReadOnlySparseTimeSeries<int> sparse = series;
+
+        series[start] = 1;
+        series[middle] = 2;
+
+        var sum = TimeSeriesAggregation.Sum(sparse, Period.Hour);
+        var count = TimeSeriesAggregation.Count(sparse, Period.Hour);
+
+        sum.ExplicitPointCount.Should().Be(1);
+        sum[start].Should().Be(3);
+        count[start].Should().Be(2);
+    }
+
+    [Fact]
+    public void BoundedStepwiseAggregation_ShouldAggregateDenseLogicalValuesWithinLogicalRange()
+    {
+        var start = new DateTimeOffset(2024, 1, 1, 0, 0, 0, TimeSpan.Zero);
+        var midpoint = start.AddMinutes(30);
+        var end = start.AddMinutes(55);
+        IBoundedStepwiseTimeSeries<int> series = new StepwiseTimeSeries<int>(Period.FiveMinutes, start, end, 1);
+
+        series.SetSegment(midpoint, end.AddMinutes(5), 2);
+
+        var sum = TimeSeriesAggregation.Sum(series, Period.Hour);
+        var count = TimeSeriesAggregation.Count(series, Period.Hour);
+
+        sum.LogicalRangeStart.Should().Be(start);
+        sum.LogicalRangeEnd.Should().Be(start);
+        sum[start].Should().Be(18);
+        count[start].Should().Be(12);
     }
 }

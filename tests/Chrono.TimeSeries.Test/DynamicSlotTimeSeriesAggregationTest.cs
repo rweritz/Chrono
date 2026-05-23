@@ -17,7 +17,7 @@ public class DynamicSlotTimeSeriesAggregationTest
         var avg = TimeSeriesAggregation.Average(series, Period.Hour);
         var cnt = TimeSeriesAggregation.Count(series, Period.Hour);
 
-        sum.Count.Should().Be(1);
+        sum.ExplicitPointCount.Should().Be(1);
         sum[start].Should().Be(78);
         avg[start].Should().Be(6);
         cnt[start].Should().Be(12);
@@ -34,7 +34,7 @@ public class DynamicSlotTimeSeriesAggregationTest
 
         var year = TimeSeriesAggregation.Sum(series, Period.Year);
 
-        year.Count.Should().Be(1);
+        year.ExplicitPointCount.Should().Be(1);
         year[new DateTimeOffset(2024, 1, 1, 0, 0, 0, TimeSpan.Zero)].Should().Be(78);
     }
 
@@ -48,7 +48,7 @@ public class DynamicSlotTimeSeriesAggregationTest
 
         var max = TimeSeriesAggregation.Max(series, Period.Day);
 
-        max.Count.Should().Be(1);
+        max.ExplicitPointCount.Should().Be(1);
         max[start].Should().Be(23.5m);
     }
 }

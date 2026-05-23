@@ -3,7 +3,7 @@ using System.Numerics;
 
 namespace Chrono.TimeSeries;
 
-public class SortedArrayTimeSeries<T> : ITimeSeries<T>
+public class SortedArrayTimeSeries<T> : ISparseTimeSeries<T>, IEnumerable<TimeSeriesPoint<T>>
     where T : struct, INumber<T>
 {
     private long[] _keys;
@@ -27,7 +27,7 @@ public class SortedArrayTimeSeries<T> : ITimeSeries<T>
 
     public Period Period { get; }
 
-    public int Count => _count;
+    public int ExplicitPointCount => _count;
 
     public DateTimeOffset MinDate =>
         _count == 0
@@ -84,6 +84,9 @@ public class SortedArrayTimeSeries<T> : ITimeSeries<T>
         InsertAt(~index, ticks, value);
     }
 
+    public void SetSegment(DateTimeOffset startInclusive, DateTimeOffset endExclusive, T value) =>
+        SparseSegmentWriter.SetSegment(Period, startInclusive, endExclusive, value, Set);
+
     public bool Remove(DateTimeOffset timestamp)
     {
         var index = Array.BinarySearch(_keys, 0, _count, timestamp.UtcTicks);
@@ -107,11 +110,13 @@ public class SortedArrayTimeSeries<T> : ITimeSeries<T>
         _reference = null;
     }
 
-    public IEnumerator<TimeSeriesPoint<T>> GetEnumerator()
+    public IEnumerable<TimeSeriesPoint<T>> GetPoints()
     {
         for (var i = 0; i < _count; i++)
             yield return new TimeSeriesPoint<T>(new DateTimeOffset(_keys[i], TimeSpan.Zero), _values[i]);
     }
+
+    public IEnumerator<TimeSeriesPoint<T>> GetEnumerator() => GetPoints().GetEnumerator();
 
     IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
 

@@ -54,7 +54,16 @@ var halved   = TimeSeriesMath.Divide(series, 2.0);     // [5, 10]
 | `TimeSeriesMath.Add(series, scalar)` | Each value + scalar |
 | `TimeSeriesMath.Divide(series, scalar)` | Each value ÷ scalar |
 
-Scalar operations work on `FixedSlotTimeSeries<T>`, `SortedArrayTimeSeries<T>`, and `DynamicSlotTimeSeries<T>`.
+Scalar operations work on `FixedSlotTimeSeries<T>`, `SortedArrayTimeSeries<T>`, `DynamicSlotTimeSeries<T>`, and `IBoundedStepwiseTimeSeries<T>`.
+
+## Family-Level Overloads
+
+The abstraction split is reflected in the math API:
+
+- `IReadOnlySparseTimeSeries<T>` inputs produce sparse `SortedArrayTimeSeries<T>` results that preserve explicit point presence.
+- `IBoundedStepwiseTimeSeries<T>` inputs produce `StepwiseTimeSeries<T>` results that preserve dense logical reads across the resulting logical range.
+
+For bounded stepwise series, `MissingValuePolicy.UnionWithZero` requires overlapping or directly contiguous logical ranges. Disconnected logical ranges throw instead of inventing values across a gap.
 
 ## Missing Value Policy
 

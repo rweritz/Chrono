@@ -42,3 +42,12 @@ Two implementations exist, both in `Chrono.TimeSeries`:
 - **Custom assertions**: `TimeSeriesAssertions` extends `ReferenceTypeAssertions<ITimeSeries<double>>`; accessed via `ShouldExtensions.Should()` on `ITimeSeries<double>`
 - **Nullable + implicit usings** are enabled in all three projects
 - **Benchmark class** (`TimeSeriesPerformance`) uses `[Benchmark]`-attributed public methods; `Program.cs` calls `BenchmarkRunner.Run<TimeSeriesPerformance>()`
+
+## Pull Request Titles
+
+- **PR titles must use Conventional Commits** because squash merges use the PR title as the commit message.
+- **Format**: `<type>[optional scope]: <description>`
+- **Allowed types**: `feat`, `fix`, `docs`, `style`, `refactor`, `perf`, `test`, `build`, `ci`, `chore`, `revert`
+- **Rule of thumb**: use `feat` for user-visible capability, `fix` for bug fixes, and `docs` for documentation-only changes.
+- **Examples**: `feat: add bounded stepwise time series`, `fix(storage): preserve trailing value on contiguous expansion`, `docs: clarify sparse versus stepwise aggregation`
+- **When creating or editing a PR, always set a compliant title immediately** instead of relying on a later manual fix.

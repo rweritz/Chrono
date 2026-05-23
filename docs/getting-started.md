@@ -24,7 +24,7 @@ using Chrono.TimeSeries;
 ### Creating a series and adding data
 
 ```csharp
-// A 5-minute interval series of doubles
+// A sparse 5-minute interval series of doubles
 var series = new FixedSlotTimeSeries<double>(Period.FiveMinutes);
 
 var start = new DateTimeOffset(2024, 1, 1, 0, 0, 0, TimeSpan.Zero);
@@ -32,9 +32,9 @@ series[start] = 10.0;
 series[start.AddMinutes(5)] = 20.0;
 series[start.AddMinutes(10)] = 30.0;
 
-Console.WriteLine(series.Count);    // 3
-Console.WriteLine(series.MinDate);  // 2024-01-01T00:00:00+00:00
-Console.WriteLine(series.MaxDate);  // 2024-01-01T00:10:00+00:00
+Console.WriteLine(series.ExplicitPointCount); // 3
+Console.WriteLine(series.MinDate);            // 2024-01-01T00:00:00+00:00
+Console.WriteLine(series.MaxDate);            // 2024-01-01T00:10:00+00:00
 ```
 
 ### Reading values
@@ -48,13 +48,29 @@ if (series.TryGetValue(start, out double v))
     Console.WriteLine(v);
 ```
 
-### Iterating
+### Enumerating sparse points
 
-Every time series implements `IEnumerable<TimeSeriesPoint<T>>`:
+Sparse time series expose explicit points through `GetPoints()`:
 
 ```csharp
-foreach (var point in series)
+foreach (var point in series.GetPoints())
     Console.WriteLine($"{point.Timestamp:O} => {point.Value}");
+```
+
+Bounded stepwise time series expose change-points separately from their logical range:
+
+```csharp
+var stepwise = new StepwiseTimeSeries<double>(
+    Period.FiveMinutes,
+    start,
+    start.AddMinutes(10),
+    10.0);
+
+Console.WriteLine(stepwise.LogicalSlotCount); // 3 logical slots
+Console.WriteLine(stepwise.ChangePointCount); // 2 stored change-points
+
+foreach (var changePoint in stepwise.GetChangePoints())
+    Console.WriteLine($"{changePoint.Timestamp:O} => {changePoint.Value}");
 ```
 
 ### Removing values

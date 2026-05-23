@@ -41,7 +41,7 @@ public class DynamicSlotTimeSeriesMathTest
 
         var sum = TimeSeriesMath.Add(a, b, MissingValuePolicy.UnionWithZero);
 
-        sum.Count.Should().Be(3);
+        sum.ExplicitPointCount.Should().Be(3);
         sum[jan].Should().Be(2);
         sum[feb].Should().Be(14);
         sum[mar].Should().Be(20);

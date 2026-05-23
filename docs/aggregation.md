@@ -32,7 +32,7 @@ Five built-in aggregation kinds are available, each with a convenience method:
 | `TimeSeriesAggregation.Average(source, targetPeriod)` | Arithmetic mean of values in each bucket | Same as input |
 | `TimeSeriesAggregation.Min(source, targetPeriod)` | Minimum value in each bucket | Same as input |
 | `TimeSeriesAggregation.Max(source, targetPeriod)` | Maximum value in each bucket | Same as input |
-| `TimeSeriesAggregation.Count(source, targetPeriod)` | Number of data points in each bucket | `int` |
+| `TimeSeriesAggregation.Count(source, targetPeriod)` | Number of explicit sparse points or bounded-stepwise logical slots in each bucket, depending on the source family | `int` |
 
 ### Min and Max
 
@@ -137,6 +137,14 @@ var hourly = TimeSeriesAggregation.Sum(sparse, Period.Hour);
 // Returns SortedArrayTimeSeries<double> with Period.Hour
 ```
 
+The same sparse semantics are also available through `IReadOnlySparseTimeSeries<T>` overloads. Aggregation only sees explicitly stored points; it does not infer carried-forward values between them.
+
+### Bounded Stepwise Aggregation
+
+`IBoundedStepwiseTimeSeries<T>` aggregation rolls up dense logical reads across the source logical range and returns a `StepwiseTimeSeries<T>` at the target period. Because every aligned slot inside the logical range contributes, aggregation reflects the effective stepwise values rather than only the stored change-points.
+
+That family distinction also applies to `TimeSeriesAggregation.Count(...)`: sparse inputs count explicit points, while bounded stepwise inputs count logical slots inside the logical range.
+
 ## FixedSlotTimeSeries vs SortedArrayTimeSeries Aggregation
 
 Both series types have full aggregation support with the same method names:
@@ -158,7 +166,7 @@ Aggregating an empty series returns a new empty series of the target period:
 ```csharp
 var empty = new FixedSlotTimeSeries<double>(Period.FiveMinutes);
 var result = TimeSeriesAggregation.Sum(empty, Period.Hour);
-Console.WriteLine(result.Count); // 0
+Console.WriteLine(result.ExplicitPointCount); // 0
 ```
 
 ## Handling Gaps

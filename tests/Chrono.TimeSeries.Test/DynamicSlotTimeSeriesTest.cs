@@ -27,7 +27,7 @@ public class DynamicSlotTimeSeriesTest
 
         series[t1].Should().Be(10);
         series[t2].Should().Be(20);
-        series.Count.Should().Be(2);
+        series.ExplicitPointCount.Should().Be(2);
         series.MinDate.Should().Be(t1);
         series.MaxDate.Should().Be(t2);
     }
@@ -73,7 +73,7 @@ public class DynamicSlotTimeSeriesTest
         series[aligned].Should().Be(7);
         series[misaligned].Should().Be(7);
         series.Remove(misaligned).Should().BeTrue();
-        series.Count.Should().Be(0);
+        series.ExplicitPointCount.Should().Be(0);
     }
 
     [Fact]
@@ -92,7 +92,7 @@ public class DynamicSlotTimeSeriesTest
         points[1].Timestamp.Should().Be(t2);
 
         series.Clear();
-        series.Count.Should().Be(0);
+        series.ExplicitPointCount.Should().Be(0);
         var read = () => _ = series.MinDate;
         read.Should().Throw<InvalidOperationException>();
     }
