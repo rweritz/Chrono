@@ -22,4 +22,4 @@ Chrono.TimeSeries is designed for scenarios where you need to store, combine, an
 - **Immutable results** — arithmetic and aggregation operations return new series rather than mutating inputs
 - **SIMD where it counts** — vectorized fast paths for `double` and `int` ensure bulk operations hit hardware limits
 
-For a quick overview and benchmark summary, see the root [README](../README.md).
+For a quick overview and benchmark summary, see the root [README](../../README.md).
