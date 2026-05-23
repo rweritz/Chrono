@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.0](https://github.com/rweritz/Chrono/compare/Chrono.TimeSeries-v0.2.0...Chrono.TimeSeries-v0.3.0) (2026-05-23)
+
+
+### Features
+
+* implement bounded stepwise time series split ([#17](https://github.com/rweritz/Chrono/issues/17)) ([27eb297](https://github.com/rweritz/Chrono/commit/27eb297a8cb4bd4d2f27c5bca0c93438e2903fe4))
+
 ## [0.2.0](https://github.com/rweritz/Chrono/compare/Chrono.TimeSeries-v0.1.0...Chrono.TimeSeries-v0.2.0) (2026-03-31)
 
 
