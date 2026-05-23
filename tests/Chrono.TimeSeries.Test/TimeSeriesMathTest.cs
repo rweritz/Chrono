@@ -24,7 +24,7 @@ public class TimeSeriesMathTest
         var mul = TimeSeriesMath.Multiply(a, b, MissingValuePolicy.Intersection);
         var div = TimeSeriesMath.Divide(a, b, MissingValuePolicy.Intersection);
 
-        add.Count.Should().Be(1);
+        add.ExplicitPointCount.Should().Be(1);
         add[t1].Should().Be(24);
         sub[t1].Should().Be(16);
         mul[t1].Should().Be(80);
@@ -45,7 +45,7 @@ public class TimeSeriesMathTest
 
         var add = TimeSeriesMath.Add(a, b, MissingValuePolicy.UnionWithZero);
 
-        add.Count.Should().Be(2);
+        add.ExplicitPointCount.Should().Be(2);
         add[t0].Should().Be(2);
         add[t1].Should().Be(3);
     }
@@ -90,5 +90,73 @@ public class TimeSeriesMathTest
         add[start.AddMinutes(5)].Should().Be(22);
         scaled[start].Should().Be(3);
         scaled[start.AddMinutes(5)].Should().Be(6);
+    }
+
+    [Fact]
+    public void SparseFamilyMath_ShouldWorkAcrossImplementationsThroughSparseContract()
+    {
+        var start = new DateTimeOffset(2022, 2, 6, 5, 0, 0, TimeSpan.Zero);
+        var middle = start.AddMinutes(5);
+        var end = start.AddMinutes(10);
+
+        IReadOnlySparseTimeSeries<int> left = new FixedSlotTimeSeries<int>(Period.FiveMinutes);
+        var rightSeries = new SortedArrayTimeSeries<int>(Period.FiveMinutes);
+        IReadOnlySparseTimeSeries<int> right = rightSeries;
+
+        ((ITimeSeries<int>)left)[start] = 2;
+        ((ITimeSeries<int>)left)[middle] = 4;
+        rightSeries[middle] = 10;
+        rightSeries[end] = 20;
+
+        var union = TimeSeriesMath.Add(left, right, MissingValuePolicy.UnionWithZero);
+
+        union.ExplicitPointCount.Should().Be(3);
+        union[start].Should().Be(2);
+        union[middle].Should().Be(14);
+        union[end].Should().Be(20);
+        union.Select(point => point.Timestamp).Should().Equal(start, middle, end);
+    }
+
+    [Fact]
+    public void BoundedStepwiseMath_ShouldUseDenseLogicalRangeSemantics()
+    {
+        var start = new DateTimeOffset(2024, 1, 1, 0, 0, 0, TimeSpan.Zero);
+        var second = start.AddMinutes(5);
+        var third = start.AddMinutes(10);
+        var end = start.AddMinutes(15);
+
+        IBoundedStepwiseTimeSeries<int> left = new StepwiseTimeSeries<int>(Period.FiveMinutes, start, third, 1);
+        IBoundedStepwiseTimeSeries<int> right = new StepwiseTimeSeries<int>(Period.FiveMinutes, second, end, 10);
+
+        left[second] = 2;
+        left[third] = 2;
+
+        var sum = TimeSeriesMath.Add(left, right, MissingValuePolicy.UnionWithZero);
+
+        sum.LogicalRangeStart.Should().Be(start);
+        sum.LogicalRangeEnd.Should().Be(end);
+        sum[start].Should().Be(1);
+        sum[second].Should().Be(12);
+        sum[third].Should().Be(12);
+        sum[end].Should().Be(10);
+        sum.GetChangePoints().Should().Equal(
+            new TimeSeriesPoint<int>(start, 1),
+            new TimeSeriesPoint<int>(second, 12),
+            new TimeSeriesPoint<int>(end, 10));
+    }
+
+    [Fact]
+    public void BoundedStepwiseUnionWithZero_ShouldRejectDisconnectedLogicalRanges()
+    {
+        var start = new DateTimeOffset(2024, 1, 1, 0, 0, 0, TimeSpan.Zero);
+        var leftEnd = start.AddMinutes(10);
+        var rightStart = start.AddMinutes(20);
+        var rightEnd = start.AddMinutes(30);
+        IBoundedStepwiseTimeSeries<int> left = new StepwiseTimeSeries<int>(Period.FiveMinutes, start, leftEnd, 1);
+        IBoundedStepwiseTimeSeries<int> right = new StepwiseTimeSeries<int>(Period.FiveMinutes, rightStart, rightEnd, 2);
+
+        Action act = () => TimeSeriesMath.Add(left, right, MissingValuePolicy.UnionWithZero);
+
+        act.Should().Throw<InvalidOperationException>();
     }
 }

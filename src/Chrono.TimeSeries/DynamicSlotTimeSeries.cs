@@ -3,7 +3,7 @@ using System.Numerics;
 
 namespace Chrono.TimeSeries;
 
-public sealed class DynamicSlotTimeSeries<T> : ITimeSeries<T>
+public sealed class DynamicSlotTimeSeries<T> : ISparseTimeSeries<T>, IEnumerable<TimeSeriesPoint<T>>
     where T : struct, INumber<T>
 {
     private long _startSlot;
@@ -27,7 +27,7 @@ public sealed class DynamicSlotTimeSeries<T> : ITimeSeries<T>
 
     public AlignMode AlignMode { get; }
 
-    public int Count => _count;
+    public int ExplicitPointCount => _count;
 
     public DateTimeOffset MinDate
     {
@@ -76,6 +76,9 @@ public sealed class DynamicSlotTimeSeries<T> : ITimeSeries<T>
             _count++;
         }
     }
+
+    public void SetSegment(DateTimeOffset startInclusive, DateTimeOffset endExclusive, T value) =>
+        SparseSegmentWriter.SetSegment(Period, startInclusive, endExclusive, value, Set);
 
     public bool Remove(DateTimeOffset timestamp)
     {
@@ -126,7 +129,7 @@ public sealed class DynamicSlotTimeSeries<T> : ITimeSeries<T>
         return true;
     }
 
-    public IEnumerator<TimeSeriesPoint<T>> GetEnumerator()
+    public IEnumerable<TimeSeriesPoint<T>> GetPoints()
     {
         for (var i = 0; i < _length; i++)
         {
@@ -138,6 +141,8 @@ public sealed class DynamicSlotTimeSeries<T> : ITimeSeries<T>
                 _values[i]);
         }
     }
+
+    public IEnumerator<TimeSeriesPoint<T>> GetEnumerator() => GetPoints().GetEnumerator();
 
     IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
 

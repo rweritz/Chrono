@@ -1,8 +1,12 @@
 # Time Series Types
 
-Chrono provides three concrete time series implementations, all implementing `ITimeSeries<T>`.
+Chrono provides sparse time series and bounded stepwise time series with family-specific count and enumeration semantics.
 
-## FixedSlotTimeSeries\<T\>
+## Sparse time series
+
+Sparse time series only contain explicitly stored points. They implement `ISparseTimeSeries<T>`, expose `ExplicitPointCount`, and enumerate stored points through `GetPoints()`.
+
+### FixedSlotTimeSeries\<T\>
 
 Dense slot-indexed storage for fixed-length periods (`FiveMinutes` through `Week`).
 
@@ -10,7 +14,7 @@ Dense slot-indexed storage for fixed-length periods (`FiveMinutes` through `Week
 - Best raw performance for fixed cadence data
 - Not suitable for variable-length calendar periods
 
-## SortedArrayTimeSeries\<T\>
+### SortedArrayTimeSeries\<T\>
 
 Sorted parallel arrays (`long` ticks + values), with binary-search access.
 
@@ -18,7 +22,7 @@ Sorted parallel arrays (`long` ticks + values), with binary-search access.
 - Memory usage proportional to point count
 - Reference-based alignment validation for non-`NonStandard` periods
 
-## DynamicSlotTimeSeries\<T\>
+### DynamicSlotTimeSeries\<T\>
 
 Calendar-aware slot-indexed storage for all periods except `NonStandard`.
 
@@ -26,12 +30,21 @@ Calendar-aware slot-indexed storage for all periods except `NonStandard`.
 - Supports `AlignMode.Strict` and `AlignMode.Truncate`
 - Best when you need fast access for calendar periods (`Month`, `QuaterYear`, etc.)
 
+## Bounded stepwise time series
+
+`StepwiseTimeSeries<T>` implements `IBoundedStepwiseTimeSeries<T>`. It exposes an explicit logical range through `LogicalRangeStart`, `LogicalRangeEnd`, and `LogicalSlotCount`, while stored change-points are surfaced separately through `ChangePointCount` and `GetChangePoints()`.
+
+- Dense logical reads within the logical range
+- Canonical compression of stored change-points
+- Contiguous-only logical range expansion
+
 ## Quick Comparison
 
-| Criterion | FixedSlotTimeSeries | SortedArrayTimeSeries | DynamicSlotTimeSeries |
-|---|---|---|---|
-| Period support | Fixed only | All (incl. NonStandard) | All except NonStandard |
-| Access complexity | O(1) | O(log n) | O(1) |
-| Insert complexity | O(1) amortized | O(n) worst | O(1) amortized |
-| Enumeration | Slot order | Sorted | Slot order |
-| Alignment mode | Strict fixed-grid | Reference-based | Strict/Truncate |
+| Criterion | FixedSlotTimeSeries | SortedArrayTimeSeries | DynamicSlotTimeSeries | StepwiseTimeSeries |
+|---|---|---|---|---|
+| Family | Sparse | Sparse | Sparse | Bounded stepwise |
+| Period support | Fixed only | All (incl. NonStandard) | All except NonStandard | All except NonStandard |
+| Read semantics | Explicit points only | Explicit points only | Explicit points only | Dense logical reads in logical range |
+| Count surface | `ExplicitPointCount` | `ExplicitPointCount` | `ExplicitPointCount` | `LogicalSlotCount` + `ChangePointCount` |
+| Enumeration surface | `GetPoints()` | `GetPoints()` | `GetPoints()` | `GetChangePoints()` |
+| Alignment mode | Strict fixed-grid | Reference-based | Strict/Truncate | Strict |
