@@ -8,6 +8,160 @@ namespace Chrono.Testing.Test;
 public sealed class ChronoTimeSeriesGeneratorTest
 {
     [Fact]
+    public void ConstantBuildsRequestedShapeWithConfiguredPeriodStartCountAndValue()
+    {
+        var start = new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero);
+
+        var series = ChronoTimeSeriesGenerator
+            .For<double>()
+            .WithPeriod(Period.Day)
+            .WithStart(start)
+            .WithCount(3)
+            .Constant(12.5)
+            .AsFixedSlot()
+            .Build();
+
+        series.Should().BeOfType<FixedSlotTimeSeries<double>>();
+        series.Period.Should().Be(Period.Day);
+        series.ExplicitPointCount.Should().Be(3);
+        series.GetPoints().Should().Equal(
+            new TimeSeriesPoint<double>(start, 12.5),
+            new TimeSeriesPoint<double>(start.AddDays(1), 12.5),
+            new TimeSeriesPoint<double>(start.AddDays(2), 12.5));
+    }
+
+    [Fact]
+    public void RandomWalkBuildsSamePointsForSameSeed()
+    {
+        var start = new DateTimeOffset(2026, 2, 1, 0, 0, 0, TimeSpan.Zero);
+
+        var first = ChronoTimeSeriesGenerator
+            .For<decimal>()
+            .WithPeriod(Period.Hour)
+            .WithStart(start)
+            .WithCount(5)
+            .WithSeed(42)
+            .RandomWalk(100m, 2m)
+            .AsSortedArray()
+            .Build();
+
+        var second = ChronoTimeSeriesGenerator
+            .For<decimal>()
+            .WithPeriod(Period.Hour)
+            .WithStart(start)
+            .WithCount(5)
+            .WithSeed(42)
+            .RandomWalk(100m, 2m)
+            .AsSortedArray()
+            .Build();
+
+        first.Should().BeOfType<SortedArrayTimeSeries<decimal>>();
+        first.Period.Should().Be(Period.Hour);
+        first.ExplicitPointCount.Should().Be(5);
+        first.GetPoints().Select(point => point.Timestamp).Should().Equal(
+            start,
+            start.AddHours(1),
+            start.AddHours(2),
+            start.AddHours(3),
+            start.AddHours(4));
+        first.GetPoints().Should().Equal(second.GetPoints());
+    }
+
+    [Fact]
+    public void LinearTrendBuildsArithmeticSequence()
+    {
+        var start = new DateTimeOffset(2026, 3, 1, 0, 0, 0, TimeSpan.Zero);
+
+        var series = ChronoTimeSeriesGenerator
+            .For<int>()
+            .WithPeriod(Period.Month)
+            .WithStart(start)
+            .WithCount(4)
+            .LinearTrend(10, 3)
+            .AsDynamicSlot()
+            .Build();
+
+        series.Should().BeOfType<DynamicSlotTimeSeries<int>>();
+        series.GetPoints().Should().Equal(
+            new TimeSeriesPoint<int>(start, 10),
+            new TimeSeriesPoint<int>(start.AddMonths(1), 13),
+            new TimeSeriesPoint<int>(start.AddMonths(2), 16),
+            new TimeSeriesPoint<int>(start.AddMonths(3), 19));
+    }
+
+    [Fact]
+    public void StepFunctionBuildsConfiguredLevelsForConfiguredStepLength()
+    {
+        var start = new DateTimeOffset(2026, 4, 1, 0, 0, 0, TimeSpan.Zero);
+
+        var series = ChronoTimeSeriesGenerator
+            .For<int>()
+            .WithPeriod(Period.Day)
+            .WithStart(start)
+            .WithCount(5)
+            .StepFunction(2, 1, 5, 2)
+            .AsSortedArray()
+            .Build();
+
+        series.GetPoints().Should().Equal(
+            new TimeSeriesPoint<int>(start, 1),
+            new TimeSeriesPoint<int>(start.AddDays(1), 1),
+            new TimeSeriesPoint<int>(start.AddDays(2), 5),
+            new TimeSeriesPoint<int>(start.AddDays(3), 5),
+            new TimeSeriesPoint<int>(start.AddDays(4), 2));
+    }
+
+    [Fact]
+    public void SparseGeneratorBuildsSameGapsForSameSeedAndLeavesActualMissingPoints()
+    {
+        var start = new DateTimeOffset(2026, 5, 1, 0, 0, 0, TimeSpan.Zero);
+
+        var first = ChronoTimeSeriesGenerator
+            .For<double>()
+            .WithPeriod(Period.Hour)
+            .WithStart(start)
+            .WithCount(12)
+            .WithSeed(99)
+            .Constant(7.0)
+            .Sparse(0.45)
+            .AsSortedArray()
+            .Build();
+
+        var second = ChronoTimeSeriesGenerator
+            .For<double>()
+            .WithPeriod(Period.Hour)
+            .WithStart(start)
+            .WithCount(12)
+            .WithSeed(99)
+            .Constant(7.0)
+            .Sparse(0.45)
+            .AsSortedArray()
+            .Build();
+
+        var differentSeed = ChronoTimeSeriesGenerator
+            .For<double>()
+            .WithPeriod(Period.Hour)
+            .WithStart(start)
+            .WithCount(12)
+            .WithSeed(100)
+            .Constant(7.0)
+            .Sparse(0.45)
+            .AsSortedArray()
+            .Build();
+
+        first.GetPoints().Should().Equal(second.GetPoints());
+        first.GetPoints().Should().NotEqual(differentSeed.GetPoints());
+        first.ExplicitPointCount.Should().BeGreaterThan(0).And.BeLessThan(12);
+
+        var explicitTimestamps = first.GetPoints().Select(point => point.Timestamp).ToHashSet();
+        var missingTimestamp = Enumerable.Range(0, 12)
+            .Select(offset => start.AddHours(offset))
+            .First(timestamp => !explicitTimestamps.Contains(timestamp));
+
+        first.TryGetValue(missingTimestamp, out _).Should().BeFalse();
+    }
+
+    [Fact]
     public void BuildMaterializesDeterministicSortedArraySeries()
     {
         var start = new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero);
