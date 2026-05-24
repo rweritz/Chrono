@@ -66,6 +66,32 @@ The abstraction split is reflected in the math API:
 
 For bounded stepwise series, `MissingValuePolicy.UnionWithZero` requires overlapping or directly contiguous logical ranges. Disconnected logical ranges throw instead of inventing values across a gap.
 
+## Explicit Specialization APIs
+
+Default arithmetic keeps the compatibility result matrix intact, but you can explicitly request a target family through `Try...As...` helpers:
+
+```csharp
+IReadOnlyTimeSeries<int> left = new SortedArrayTimeSeries<int>(Period.FiveMinutes);
+IReadOnlyTimeSeries<int> right = new DynamicSlotTimeSeries<int>(Period.FiveMinutes);
+
+if (TimeSeriesMath.TryAddAsFixedSlotTimeSeries(left, right, out var fixedResult, MissingValuePolicy.UnionWithZero))
+{
+    // fixedResult is a FixedSlotTimeSeries<int>
+}
+```
+
+Available binary specialization targets:
+
+- `TryAddAsFixedSlotTimeSeries`, `TrySubtractAsFixedSlotTimeSeries`, `TryMultiplyAsFixedSlotTimeSeries`, `TryDivideAsFixedSlotTimeSeries`
+- `TryAddAsDynamicSlotTimeSeries`, `TrySubtractAsDynamicSlotTimeSeries`, `TryMultiplyAsDynamicSlotTimeSeries`, `TryDivideAsDynamicSlotTimeSeries`
+- `TryAddAsBoundedStepwiseTimeSeries`, `TrySubtractAsBoundedStepwiseTimeSeries`, `TryMultiplyAsBoundedStepwiseTimeSeries`, `TryDivideAsBoundedStepwiseTimeSeries`
+
+These helpers return `false` instead of changing semantics when the requested target family is not valid for the arithmetic result. Examples:
+
+- fixed-slot specialization fails for non-fixed periods such as `Period.Month`
+- bounded stepwise specialization fails for sparse-result arithmetic
+- sparse targets fail for bounded stepwise result semantics
+
 ## Missing Value Policy
 
 When two series don't have values at exactly the same timestamps, the `MissingValuePolicy` controls behavior:
