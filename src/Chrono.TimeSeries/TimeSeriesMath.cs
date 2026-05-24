@@ -5,57 +5,57 @@ namespace Chrono.TimeSeries;
 
 public static class TimeSeriesMath
 {
-    public static SortedArrayTimeSeries<T> Add<T>(
+    public static IReadOnlySparseTimeSeries<T> Add<T>(
         IReadOnlySparseTimeSeries<T> left,
         IReadOnlySparseTimeSeries<T> right,
         MissingValuePolicy policy = MissingValuePolicy.Intersection)
         where T : struct, INumber<T>
     {
         EnsureCompatible(left, right);
-        return MergeSparse(left, right, policy, static (a, b) => a + b);
+        return MergeSparseCompatibility(left, right, policy, static (a, b) => a + b);
     }
 
-    public static SortedArrayTimeSeries<T> Subtract<T>(
+    public static IReadOnlySparseTimeSeries<T> Subtract<T>(
         IReadOnlySparseTimeSeries<T> left,
         IReadOnlySparseTimeSeries<T> right,
         MissingValuePolicy policy = MissingValuePolicy.Intersection)
         where T : struct, INumber<T>
     {
         EnsureCompatible(left, right);
-        return MergeSparse(left, right, policy, static (a, b) => a - b);
+        return MergeSparseCompatibility(left, right, policy, static (a, b) => a - b);
     }
 
-    public static SortedArrayTimeSeries<T> Multiply<T>(
+    public static IReadOnlySparseTimeSeries<T> Multiply<T>(
         IReadOnlySparseTimeSeries<T> left,
         IReadOnlySparseTimeSeries<T> right,
         MissingValuePolicy policy = MissingValuePolicy.Intersection)
         where T : struct, INumber<T>
     {
         EnsureCompatible(left, right);
-        return MergeSparse(left, right, policy, static (a, b) => a * b);
+        return MergeSparseCompatibility(left, right, policy, static (a, b) => a * b);
     }
 
-    public static SortedArrayTimeSeries<T> Divide<T>(
+    public static IReadOnlySparseTimeSeries<T> Divide<T>(
         IReadOnlySparseTimeSeries<T> left,
         IReadOnlySparseTimeSeries<T> right,
         MissingValuePolicy policy = MissingValuePolicy.Intersection)
         where T : struct, INumber<T>
     {
         EnsureCompatible(left, right);
-        return MergeSparse(left, right, policy, static (a, b) => a / b);
+        return MergeSparseCompatibility(left, right, policy, static (a, b) => a / b);
     }
 
-    public static SortedArrayTimeSeries<T> Multiply<T>(IReadOnlySparseTimeSeries<T> source, T scalar)
+    public static IReadOnlySparseTimeSeries<T> Multiply<T>(IReadOnlySparseTimeSeries<T> source, T scalar)
         where T : struct, INumber<T>
-        => TransformSparse(source, static (value, operand) => value * operand, scalar);
+        => TransformSparseCompatibility(source, static (value, operand) => value * operand, scalar);
 
-    public static SortedArrayTimeSeries<T> Add<T>(IReadOnlySparseTimeSeries<T> source, T scalar)
+    public static IReadOnlySparseTimeSeries<T> Add<T>(IReadOnlySparseTimeSeries<T> source, T scalar)
         where T : struct, INumber<T>
-        => TransformSparse(source, static (value, operand) => value + operand, scalar);
+        => TransformSparseCompatibility(source, static (value, operand) => value + operand, scalar);
 
-    public static SortedArrayTimeSeries<T> Divide<T>(IReadOnlySparseTimeSeries<T> source, T scalar)
+    public static IReadOnlySparseTimeSeries<T> Divide<T>(IReadOnlySparseTimeSeries<T> source, T scalar)
         where T : struct, INumber<T>
-        => TransformSparse(source, static (value, operand) => value / operand, scalar);
+        => TransformSparseCompatibility(source, static (value, operand) => value / operand, scalar);
 
     public static StepwiseTimeSeries<T> Add<T>(
         IBoundedStepwiseTimeSeries<T> left,
@@ -133,6 +133,66 @@ public static class TimeSeriesMath
         return MergeRegular(left, right, policy, static (a, b) => a + b);
     }
 
+    public static IReadOnlySparseTimeSeries<T> Add<T>(
+        FixedSlotTimeSeries<T> left,
+        SortedArrayTimeSeries<T> right,
+        MissingValuePolicy policy = MissingValuePolicy.Intersection)
+        where T : struct, INumber<T>
+    {
+        EnsureCompatible(left, right);
+        return MergeSparseCompatibility(left, right, policy, static (a, b) => a + b);
+    }
+
+    public static IReadOnlySparseTimeSeries<T> Add<T>(
+        SortedArrayTimeSeries<T> left,
+        FixedSlotTimeSeries<T> right,
+        MissingValuePolicy policy = MissingValuePolicy.Intersection)
+        where T : struct, INumber<T>
+    {
+        EnsureCompatible(left, right);
+        return MergeSparseCompatibility(left, right, policy, static (a, b) => a + b);
+    }
+
+    public static IReadOnlySparseTimeSeries<T> Add<T>(
+        FixedSlotTimeSeries<T> left,
+        DynamicSlotTimeSeries<T> right,
+        MissingValuePolicy policy = MissingValuePolicy.Intersection)
+        where T : struct, INumber<T>
+    {
+        EnsureCompatible(left, right);
+        return MergeSparseCompatibility(left, right, policy, static (a, b) => a + b);
+    }
+
+    public static IReadOnlySparseTimeSeries<T> Add<T>(
+        DynamicSlotTimeSeries<T> left,
+        FixedSlotTimeSeries<T> right,
+        MissingValuePolicy policy = MissingValuePolicy.Intersection)
+        where T : struct, INumber<T>
+    {
+        EnsureCompatible(left, right);
+        return MergeSparseCompatibility(left, right, policy, static (a, b) => a + b);
+    }
+
+    public static IReadOnlySparseTimeSeries<T> Add<T>(
+        SortedArrayTimeSeries<T> left,
+        DynamicSlotTimeSeries<T> right,
+        MissingValuePolicy policy = MissingValuePolicy.Intersection)
+        where T : struct, INumber<T>
+    {
+        EnsureCompatible(left, right);
+        return MergeSparseCompatibility(left, right, policy, static (a, b) => a + b);
+    }
+
+    public static IReadOnlySparseTimeSeries<T> Add<T>(
+        DynamicSlotTimeSeries<T> left,
+        SortedArrayTimeSeries<T> right,
+        MissingValuePolicy policy = MissingValuePolicy.Intersection)
+        where T : struct, INumber<T>
+    {
+        EnsureCompatible(left, right);
+        return MergeSparseCompatibility(left, right, policy, static (a, b) => a + b);
+    }
+
     public static FixedSlotTimeSeries<T> Subtract<T>(
         FixedSlotTimeSeries<T> left,
         FixedSlotTimeSeries<T> right,
@@ -141,6 +201,66 @@ public static class TimeSeriesMath
     {
         EnsureCompatible(left, right);
         return MergeRegular(left, right, policy, static (a, b) => a - b);
+    }
+
+    public static IReadOnlySparseTimeSeries<T> Subtract<T>(
+        FixedSlotTimeSeries<T> left,
+        SortedArrayTimeSeries<T> right,
+        MissingValuePolicy policy = MissingValuePolicy.Intersection)
+        where T : struct, INumber<T>
+    {
+        EnsureCompatible(left, right);
+        return MergeSparseCompatibility(left, right, policy, static (a, b) => a - b);
+    }
+
+    public static IReadOnlySparseTimeSeries<T> Subtract<T>(
+        SortedArrayTimeSeries<T> left,
+        FixedSlotTimeSeries<T> right,
+        MissingValuePolicy policy = MissingValuePolicy.Intersection)
+        where T : struct, INumber<T>
+    {
+        EnsureCompatible(left, right);
+        return MergeSparseCompatibility(left, right, policy, static (a, b) => a - b);
+    }
+
+    public static IReadOnlySparseTimeSeries<T> Subtract<T>(
+        FixedSlotTimeSeries<T> left,
+        DynamicSlotTimeSeries<T> right,
+        MissingValuePolicy policy = MissingValuePolicy.Intersection)
+        where T : struct, INumber<T>
+    {
+        EnsureCompatible(left, right);
+        return MergeSparseCompatibility(left, right, policy, static (a, b) => a - b);
+    }
+
+    public static IReadOnlySparseTimeSeries<T> Subtract<T>(
+        DynamicSlotTimeSeries<T> left,
+        FixedSlotTimeSeries<T> right,
+        MissingValuePolicy policy = MissingValuePolicy.Intersection)
+        where T : struct, INumber<T>
+    {
+        EnsureCompatible(left, right);
+        return MergeSparseCompatibility(left, right, policy, static (a, b) => a - b);
+    }
+
+    public static IReadOnlySparseTimeSeries<T> Subtract<T>(
+        SortedArrayTimeSeries<T> left,
+        DynamicSlotTimeSeries<T> right,
+        MissingValuePolicy policy = MissingValuePolicy.Intersection)
+        where T : struct, INumber<T>
+    {
+        EnsureCompatible(left, right);
+        return MergeSparseCompatibility(left, right, policy, static (a, b) => a - b);
+    }
+
+    public static IReadOnlySparseTimeSeries<T> Subtract<T>(
+        DynamicSlotTimeSeries<T> left,
+        SortedArrayTimeSeries<T> right,
+        MissingValuePolicy policy = MissingValuePolicy.Intersection)
+        where T : struct, INumber<T>
+    {
+        EnsureCompatible(left, right);
+        return MergeSparseCompatibility(left, right, policy, static (a, b) => a - b);
     }
 
     public static FixedSlotTimeSeries<T> Multiply<T>(
@@ -153,6 +273,66 @@ public static class TimeSeriesMath
         return MergeRegular(left, right, policy, static (a, b) => a * b);
     }
 
+    public static IReadOnlySparseTimeSeries<T> Multiply<T>(
+        FixedSlotTimeSeries<T> left,
+        SortedArrayTimeSeries<T> right,
+        MissingValuePolicy policy = MissingValuePolicy.Intersection)
+        where T : struct, INumber<T>
+    {
+        EnsureCompatible(left, right);
+        return MergeSparseCompatibility(left, right, policy, static (a, b) => a * b);
+    }
+
+    public static IReadOnlySparseTimeSeries<T> Multiply<T>(
+        SortedArrayTimeSeries<T> left,
+        FixedSlotTimeSeries<T> right,
+        MissingValuePolicy policy = MissingValuePolicy.Intersection)
+        where T : struct, INumber<T>
+    {
+        EnsureCompatible(left, right);
+        return MergeSparseCompatibility(left, right, policy, static (a, b) => a * b);
+    }
+
+    public static IReadOnlySparseTimeSeries<T> Multiply<T>(
+        FixedSlotTimeSeries<T> left,
+        DynamicSlotTimeSeries<T> right,
+        MissingValuePolicy policy = MissingValuePolicy.Intersection)
+        where T : struct, INumber<T>
+    {
+        EnsureCompatible(left, right);
+        return MergeSparseCompatibility(left, right, policy, static (a, b) => a * b);
+    }
+
+    public static IReadOnlySparseTimeSeries<T> Multiply<T>(
+        DynamicSlotTimeSeries<T> left,
+        FixedSlotTimeSeries<T> right,
+        MissingValuePolicy policy = MissingValuePolicy.Intersection)
+        where T : struct, INumber<T>
+    {
+        EnsureCompatible(left, right);
+        return MergeSparseCompatibility(left, right, policy, static (a, b) => a * b);
+    }
+
+    public static IReadOnlySparseTimeSeries<T> Multiply<T>(
+        SortedArrayTimeSeries<T> left,
+        DynamicSlotTimeSeries<T> right,
+        MissingValuePolicy policy = MissingValuePolicy.Intersection)
+        where T : struct, INumber<T>
+    {
+        EnsureCompatible(left, right);
+        return MergeSparseCompatibility(left, right, policy, static (a, b) => a * b);
+    }
+
+    public static IReadOnlySparseTimeSeries<T> Multiply<T>(
+        DynamicSlotTimeSeries<T> left,
+        SortedArrayTimeSeries<T> right,
+        MissingValuePolicy policy = MissingValuePolicy.Intersection)
+        where T : struct, INumber<T>
+    {
+        EnsureCompatible(left, right);
+        return MergeSparseCompatibility(left, right, policy, static (a, b) => a * b);
+    }
+
     public static FixedSlotTimeSeries<T> Divide<T>(
         FixedSlotTimeSeries<T> left,
         FixedSlotTimeSeries<T> right,
@@ -161,6 +341,66 @@ public static class TimeSeriesMath
     {
         EnsureCompatible(left, right);
         return MergeRegular(left, right, policy, static (a, b) => a / b);
+    }
+
+    public static IReadOnlySparseTimeSeries<T> Divide<T>(
+        FixedSlotTimeSeries<T> left,
+        SortedArrayTimeSeries<T> right,
+        MissingValuePolicy policy = MissingValuePolicy.Intersection)
+        where T : struct, INumber<T>
+    {
+        EnsureCompatible(left, right);
+        return MergeSparseCompatibility(left, right, policy, static (a, b) => a / b);
+    }
+
+    public static IReadOnlySparseTimeSeries<T> Divide<T>(
+        SortedArrayTimeSeries<T> left,
+        FixedSlotTimeSeries<T> right,
+        MissingValuePolicy policy = MissingValuePolicy.Intersection)
+        where T : struct, INumber<T>
+    {
+        EnsureCompatible(left, right);
+        return MergeSparseCompatibility(left, right, policy, static (a, b) => a / b);
+    }
+
+    public static IReadOnlySparseTimeSeries<T> Divide<T>(
+        FixedSlotTimeSeries<T> left,
+        DynamicSlotTimeSeries<T> right,
+        MissingValuePolicy policy = MissingValuePolicy.Intersection)
+        where T : struct, INumber<T>
+    {
+        EnsureCompatible(left, right);
+        return MergeSparseCompatibility(left, right, policy, static (a, b) => a / b);
+    }
+
+    public static IReadOnlySparseTimeSeries<T> Divide<T>(
+        DynamicSlotTimeSeries<T> left,
+        FixedSlotTimeSeries<T> right,
+        MissingValuePolicy policy = MissingValuePolicy.Intersection)
+        where T : struct, INumber<T>
+    {
+        EnsureCompatible(left, right);
+        return MergeSparseCompatibility(left, right, policy, static (a, b) => a / b);
+    }
+
+    public static IReadOnlySparseTimeSeries<T> Divide<T>(
+        SortedArrayTimeSeries<T> left,
+        DynamicSlotTimeSeries<T> right,
+        MissingValuePolicy policy = MissingValuePolicy.Intersection)
+        where T : struct, INumber<T>
+    {
+        EnsureCompatible(left, right);
+        return MergeSparseCompatibility(left, right, policy, static (a, b) => a / b);
+    }
+
+    public static IReadOnlySparseTimeSeries<T> Divide<T>(
+        DynamicSlotTimeSeries<T> left,
+        SortedArrayTimeSeries<T> right,
+        MissingValuePolicy policy = MissingValuePolicy.Intersection)
+        where T : struct, INumber<T>
+    {
+        EnsureCompatible(left, right);
+        return MergeSparseCompatibility(left, right, policy, static (a, b) => a / b);
     }
 
     public static FixedSlotTimeSeries<T> Multiply<T>(FixedSlotTimeSeries<T> input, T scalar)
@@ -598,6 +838,21 @@ public static class TimeSeriesMath
 
         return CreateSparseResult(source.Period, points);
     }
+
+    private static IReadOnlySparseTimeSeries<T> MergeSparseCompatibility<T>(
+        IReadOnlySparseTimeSeries<T> left,
+        IReadOnlySparseTimeSeries<T> right,
+        MissingValuePolicy policy,
+        Func<T, T, T> op)
+        where T : struct, INumber<T>
+        => MergeSparse(left, right, policy, op);
+
+    private static IReadOnlySparseTimeSeries<T> TransformSparseCompatibility<T>(
+        IReadOnlySparseTimeSeries<T> source,
+        Func<T, T, T> op,
+        T operand)
+        where T : struct, INumber<T>
+        => TransformSparse(source, op, operand);
 
     private static StepwiseTimeSeries<T> MergeStepwise<T>(
         IBoundedStepwiseTimeSeries<T> left,

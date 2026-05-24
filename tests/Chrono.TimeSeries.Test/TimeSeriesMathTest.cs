@@ -1,9 +1,42 @@
+using System.Linq;
+using System.Reflection;
 using FluentAssertions;
 
 namespace Chrono.TimeSeries.Test;
 
 public class TimeSeriesMathTest
 {
+    [Theory]
+    [InlineData(nameof(TimeSeriesMath.Add))]
+    [InlineData(nameof(TimeSeriesMath.Subtract))]
+    [InlineData(nameof(TimeSeriesMath.Multiply))]
+    [InlineData(nameof(TimeSeriesMath.Divide))]
+    public void SparseBinaryOverloads_ShouldExposeExpectedResultMatrix(string methodName)
+    {
+        GetSparseBinaryOverload(methodName, typeof(IReadOnlySparseTimeSeries<int>), typeof(IReadOnlySparseTimeSeries<int>))
+            .ReturnType.Should().Be(typeof(IReadOnlySparseTimeSeries<int>));
+
+        GetSparseBinaryOverload(methodName, typeof(SortedArrayTimeSeries<int>), typeof(SortedArrayTimeSeries<int>))
+            .ReturnType.Should().Be(typeof(SortedArrayTimeSeries<int>));
+        GetSparseBinaryOverload(methodName, typeof(FixedSlotTimeSeries<int>), typeof(FixedSlotTimeSeries<int>))
+            .ReturnType.Should().Be(typeof(FixedSlotTimeSeries<int>));
+        GetSparseBinaryOverload(methodName, typeof(DynamicSlotTimeSeries<int>), typeof(DynamicSlotTimeSeries<int>))
+            .ReturnType.Should().Be(typeof(DynamicSlotTimeSeries<int>));
+
+        GetSparseBinaryOverload(methodName, typeof(SortedArrayTimeSeries<int>), typeof(FixedSlotTimeSeries<int>))
+            .ReturnType.Should().Be(typeof(IReadOnlySparseTimeSeries<int>));
+        GetSparseBinaryOverload(methodName, typeof(SortedArrayTimeSeries<int>), typeof(DynamicSlotTimeSeries<int>))
+            .ReturnType.Should().Be(typeof(IReadOnlySparseTimeSeries<int>));
+        GetSparseBinaryOverload(methodName, typeof(FixedSlotTimeSeries<int>), typeof(DynamicSlotTimeSeries<int>))
+            .ReturnType.Should().Be(typeof(IReadOnlySparseTimeSeries<int>));
+        GetSparseBinaryOverload(methodName, typeof(FixedSlotTimeSeries<int>), typeof(SortedArrayTimeSeries<int>))
+            .ReturnType.Should().Be(typeof(IReadOnlySparseTimeSeries<int>));
+        GetSparseBinaryOverload(methodName, typeof(DynamicSlotTimeSeries<int>), typeof(SortedArrayTimeSeries<int>))
+            .ReturnType.Should().Be(typeof(IReadOnlySparseTimeSeries<int>));
+        GetSparseBinaryOverload(methodName, typeof(DynamicSlotTimeSeries<int>), typeof(FixedSlotTimeSeries<int>))
+            .ReturnType.Should().Be(typeof(IReadOnlySparseTimeSeries<int>));
+    }
+
     [Fact]
     public void SortedArray_Add_Subtract_Multiply_Divide_ShouldWorkWithIntersection()
     {
@@ -114,8 +147,103 @@ public class TimeSeriesMathTest
         union[start].Should().Be(2);
         union[middle].Should().Be(14);
         union[end].Should().Be(20);
-        union.Select(point => point.Timestamp).Should().Equal(start, middle, end);
+        union.GetPoints().Select(point => point.Timestamp).Should().Equal(start, middle, end);
     }
+
+    [Fact]
+    public void SparseFamilyMath_MixedConcreteInputs_ShouldRouteThroughCompatibilityResult()
+    {
+        var start = new DateTimeOffset(2022, 2, 6, 5, 0, 0, TimeSpan.Zero);
+        var middle = start.AddMinutes(5);
+        var end = start.AddMinutes(10);
+        var left = new FixedSlotTimeSeries<int>(Period.FiveMinutes);
+        var right = new DynamicSlotTimeSeries<int>(Period.FiveMinutes);
+
+        left[start] = 2;
+        left[middle] = 4;
+        right[middle] = 10;
+        right[end] = 20;
+
+        IReadOnlySparseTimeSeries<int> union = TimeSeriesMath.Add(left, right, MissingValuePolicy.UnionWithZero);
+
+        union.Should().BeOfType<SortedArrayTimeSeries<int>>();
+        union.ExplicitPointCount.Should().Be(3);
+        union.MinDate.Should().Be(start);
+        union.MaxDate.Should().Be(end);
+        union[start].Should().Be(2);
+        union[middle].Should().Be(14);
+        union[end].Should().Be(20);
+    }
+
+    [Fact]
+    public void SparseFamilyMath_MixedConcreteInputs_ShouldKeepMissingValuePolicyExplicit()
+    {
+        var start = new DateTimeOffset(2022, 2, 6, 5, 0, 0, TimeSpan.Zero);
+        var middle = start.AddMinutes(5);
+        var end = start.AddMinutes(10);
+        var left = new SortedArrayTimeSeries<int>(Period.FiveMinutes);
+        var right = new DynamicSlotTimeSeries<int>(Period.FiveMinutes);
+
+        left[start] = 7;
+        left[middle] = 11;
+        right[middle] = 3;
+        right[end] = 5;
+
+        var intersection = TimeSeriesMath.Subtract(left, right, MissingValuePolicy.Intersection);
+        Action throwOnMissing = () => TimeSeriesMath.Subtract(left, right, MissingValuePolicy.Throw);
+
+        intersection.Should().BeOfType<SortedArrayTimeSeries<int>>();
+        intersection.ExplicitPointCount.Should().Be(1);
+        intersection.MinDate.Should().Be(middle);
+        intersection.MaxDate.Should().Be(middle);
+        intersection[middle].Should().Be(8);
+        throwOnMissing.Should().Throw<InvalidOperationException>();
+    }
+
+    [Fact]
+    public void SparseFamilyMath_ExactConcreteInputs_ShouldPreserveConcreteResultFamily()
+    {
+        var start = new DateTimeOffset(2022, 2, 6, 5, 0, 0, TimeSpan.Zero);
+        var next = start.AddMinutes(5);
+
+        var sortedLeft = new SortedArrayTimeSeries<int>(Period.FiveMinutes);
+        var sortedRight = new SortedArrayTimeSeries<int>(Period.FiveMinutes);
+        sortedLeft[start] = 2;
+        sortedRight[start] = 3;
+
+        var fixedLeft = new FixedSlotTimeSeries<int>(Period.FiveMinutes);
+        var fixedRight = new FixedSlotTimeSeries<int>(Period.FiveMinutes);
+        fixedLeft[start] = 5;
+        fixedRight[start] = 7;
+
+        var dynamicLeft = new DynamicSlotTimeSeries<int>(Period.FiveMinutes);
+        var dynamicRight = new DynamicSlotTimeSeries<int>(Period.FiveMinutes);
+        dynamicLeft[next] = 11;
+        dynamicRight[next] = 13;
+
+        TimeSeriesMath.Add(sortedLeft, sortedRight).Should().BeOfType<SortedArrayTimeSeries<int>>();
+        TimeSeriesMath.Add(fixedLeft, fixedRight).Should().BeOfType<FixedSlotTimeSeries<int>>();
+        TimeSeriesMath.Add(dynamicLeft, dynamicRight).Should().BeOfType<DynamicSlotTimeSeries<int>>();
+    }
+
+    private static MethodInfo GetSparseBinaryOverload(string methodName, Type leftType, Type rightType)
+    {
+        return typeof(TimeSeriesMath)
+            .GetMethods(BindingFlags.Public | BindingFlags.Static)
+            .Select(method => method.IsGenericMethodDefinition ? method.MakeGenericMethod(typeof(int)) : method)
+            .Single(method =>
+            {
+                if (method.Name != methodName)
+                    return false;
+
+                var parameters = method.GetParameters();
+                return parameters.Length == 3
+                    && parameters[0].ParameterType == leftType
+                    && parameters[1].ParameterType == rightType
+                    && parameters[2].ParameterType == typeof(MissingValuePolicy);
+            });
+    }
+
 
     [Fact]
     public void BoundedStepwiseMath_ShouldUseDenseLogicalRangeSemantics()
