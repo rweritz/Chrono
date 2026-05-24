@@ -37,6 +37,8 @@ Console.WriteLine(series.MinDate);            // 2024-01-01T00:00:00+00:00
 Console.WriteLine(series.MaxDate);            // 2024-01-01T00:10:00+00:00
 ```
 
+`MinDate` and `MaxDate` are available on the shared read-only contract for explicit-point bounds metadata.
+
 ### Reading values
 
 ```csharp
@@ -68,10 +70,14 @@ var stepwise = new StepwiseTimeSeries<double>(
 
 Console.WriteLine(stepwise.LogicalSlotCount); // 3 logical slots
 Console.WriteLine(stepwise.ChangePointCount); // 2 stored change-points
+Console.WriteLine(stepwise.MinDate);          // explicit-point lower bound
+Console.WriteLine(stepwise.MaxDate);          // explicit-point upper bound
 
 foreach (var changePoint in stepwise.GetChangePoints())
     Console.WriteLine($"{changePoint.Timestamp:O} => {changePoint.Value}");
 ```
+
+Use `LogicalRangeStart` and `LogicalRangeEnd` when you need the bounded stepwise logical coverage rather than the shared explicit-point bounds metadata.
 
 ### Removing values
 

@@ -5,57 +5,241 @@ namespace Chrono.TimeSeries;
 
 public static class TimeSeriesMath
 {
-    public static SortedArrayTimeSeries<T> Add<T>(
+    public static IReadOnlySparseTimeSeries<T> Add<T>(
         IReadOnlySparseTimeSeries<T> left,
         IReadOnlySparseTimeSeries<T> right,
         MissingValuePolicy policy = MissingValuePolicy.Intersection)
         where T : struct, INumber<T>
     {
         EnsureCompatible(left, right);
-        return MergeSparse(left, right, policy, static (a, b) => a + b);
+        return MergeSparseCompatibility(left, right, policy, static (a, b) => a + b);
     }
 
-    public static SortedArrayTimeSeries<T> Subtract<T>(
+    public static bool TryAddAsDynamicSlotTimeSeries<T>(
+        IReadOnlyTimeSeries<T> left,
+        IReadOnlyTimeSeries<T> right,
+        out DynamicSlotTimeSeries<T>? result,
+        MissingValuePolicy policy = MissingValuePolicy.Intersection)
+        where T : struct, INumber<T>
+        => TryBinaryAsSparseTarget(left, right, policy, TimeSeriesSpecializationTarget.DynamicSlot, static (a, b) => a + b,
+            ToDynamicSlotTimeSeries, out result);
+
+    public static bool TryAddAsFixedSlotTimeSeries<T>(
+        IReadOnlyTimeSeries<T> left,
+        IReadOnlyTimeSeries<T> right,
+        out FixedSlotTimeSeries<T>? result,
+        MissingValuePolicy policy = MissingValuePolicy.Intersection)
+        where T : struct, INumber<T>
+        => TryBinaryAsSparseTarget(left, right, policy, TimeSeriesSpecializationTarget.FixedSlot, static (a, b) => a + b,
+            ToFixedSlotTimeSeries, out result);
+
+    public static bool TryAddAsBoundedStepwiseTimeSeries<T>(
+        IReadOnlyTimeSeries<T> left,
+        IReadOnlyTimeSeries<T> right,
+        out StepwiseTimeSeries<T>? result,
+        MissingValuePolicy policy = MissingValuePolicy.Intersection)
+        where T : struct, INumber<T>
+        => TryBinaryAsBoundedStepwiseTarget(left, right, policy, static (a, b) => a + b, out result);
+
+    public static IReadOnlySparseTimeSeries<T> Subtract<T>(
         IReadOnlySparseTimeSeries<T> left,
         IReadOnlySparseTimeSeries<T> right,
         MissingValuePolicy policy = MissingValuePolicy.Intersection)
         where T : struct, INumber<T>
     {
         EnsureCompatible(left, right);
-        return MergeSparse(left, right, policy, static (a, b) => a - b);
+        return MergeSparseCompatibility(left, right, policy, static (a, b) => a - b);
     }
 
-    public static SortedArrayTimeSeries<T> Multiply<T>(
+    public static bool TrySubtractAsFixedSlotTimeSeries<T>(
+        IReadOnlyTimeSeries<T> left,
+        IReadOnlyTimeSeries<T> right,
+        out FixedSlotTimeSeries<T>? result,
+        MissingValuePolicy policy = MissingValuePolicy.Intersection)
+        where T : struct, INumber<T>
+        => TryBinaryAsSparseTarget(left, right, policy, TimeSeriesSpecializationTarget.FixedSlot, static (a, b) => a - b,
+            ToFixedSlotTimeSeries, out result);
+
+    public static bool TrySubtractAsDynamicSlotTimeSeries<T>(
+        IReadOnlyTimeSeries<T> left,
+        IReadOnlyTimeSeries<T> right,
+        out DynamicSlotTimeSeries<T>? result,
+        MissingValuePolicy policy = MissingValuePolicy.Intersection)
+        where T : struct, INumber<T>
+        => TryBinaryAsSparseTarget(left, right, policy, TimeSeriesSpecializationTarget.DynamicSlot, static (a, b) => a - b,
+            ToDynamicSlotTimeSeries, out result);
+
+    public static bool TrySubtractAsBoundedStepwiseTimeSeries<T>(
+        IReadOnlyTimeSeries<T> left,
+        IReadOnlyTimeSeries<T> right,
+        out StepwiseTimeSeries<T>? result,
+        MissingValuePolicy policy = MissingValuePolicy.Intersection)
+        where T : struct, INumber<T>
+        => TryBinaryAsBoundedStepwiseTarget(left, right, policy, static (a, b) => a - b, out result);
+
+    public static IReadOnlySparseTimeSeries<T> Subtract<T>(
+        IReadOnlySparseTimeSeries<T> left,
+        IBoundedStepwiseTimeSeries<T> right,
+        MissingValuePolicy policy = MissingValuePolicy.Intersection)
+        where T : struct, INumber<T>
+    {
+        EnsureCompatible(left, right);
+        return MergeSparseWithBoundedStepwise(left, right, policy, static (a, b) => a - b);
+    }
+
+    public static IReadOnlySparseTimeSeries<T> Subtract<T>(
+        IBoundedStepwiseTimeSeries<T> left,
+        IReadOnlySparseTimeSeries<T> right,
+        MissingValuePolicy policy = MissingValuePolicy.Intersection)
+        where T : struct, INumber<T>
+    {
+        EnsureCompatible(left, right);
+        return MergeBoundedStepwiseWithSparse(left, right, policy, static (a, b) => a - b);
+    }
+
+    public static IReadOnlySparseTimeSeries<T> Multiply<T>(
         IReadOnlySparseTimeSeries<T> left,
         IReadOnlySparseTimeSeries<T> right,
         MissingValuePolicy policy = MissingValuePolicy.Intersection)
         where T : struct, INumber<T>
     {
         EnsureCompatible(left, right);
-        return MergeSparse(left, right, policy, static (a, b) => a * b);
+        return MergeSparseCompatibility(left, right, policy, static (a, b) => a * b);
     }
 
-    public static SortedArrayTimeSeries<T> Divide<T>(
+    public static bool TryMultiplyAsFixedSlotTimeSeries<T>(
+        IReadOnlyTimeSeries<T> left,
+        IReadOnlyTimeSeries<T> right,
+        out FixedSlotTimeSeries<T>? result,
+        MissingValuePolicy policy = MissingValuePolicy.Intersection)
+        where T : struct, INumber<T>
+        => TryBinaryAsSparseTarget(left, right, policy, TimeSeriesSpecializationTarget.FixedSlot, static (a, b) => a * b,
+            ToFixedSlotTimeSeries, out result);
+
+    public static bool TryMultiplyAsDynamicSlotTimeSeries<T>(
+        IReadOnlyTimeSeries<T> left,
+        IReadOnlyTimeSeries<T> right,
+        out DynamicSlotTimeSeries<T>? result,
+        MissingValuePolicy policy = MissingValuePolicy.Intersection)
+        where T : struct, INumber<T>
+        => TryBinaryAsSparseTarget(left, right, policy, TimeSeriesSpecializationTarget.DynamicSlot, static (a, b) => a * b,
+            ToDynamicSlotTimeSeries, out result);
+
+    public static bool TryMultiplyAsBoundedStepwiseTimeSeries<T>(
+        IReadOnlyTimeSeries<T> left,
+        IReadOnlyTimeSeries<T> right,
+        out StepwiseTimeSeries<T>? result,
+        MissingValuePolicy policy = MissingValuePolicy.Intersection)
+        where T : struct, INumber<T>
+        => TryBinaryAsBoundedStepwiseTarget(left, right, policy, static (a, b) => a * b, out result);
+
+    public static IReadOnlySparseTimeSeries<T> Multiply<T>(
+        IReadOnlySparseTimeSeries<T> left,
+        IBoundedStepwiseTimeSeries<T> right,
+        MissingValuePolicy policy = MissingValuePolicy.Intersection)
+        where T : struct, INumber<T>
+    {
+        EnsureCompatible(left, right);
+        return MergeSparseWithBoundedStepwise(left, right, policy, static (a, b) => a * b);
+    }
+
+    public static IReadOnlySparseTimeSeries<T> Multiply<T>(
+        IBoundedStepwiseTimeSeries<T> left,
+        IReadOnlySparseTimeSeries<T> right,
+        MissingValuePolicy policy = MissingValuePolicy.Intersection)
+        where T : struct, INumber<T>
+    {
+        EnsureCompatible(left, right);
+        return MergeBoundedStepwiseWithSparse(left, right, policy, static (a, b) => a * b);
+    }
+
+    public static IReadOnlySparseTimeSeries<T> Divide<T>(
         IReadOnlySparseTimeSeries<T> left,
         IReadOnlySparseTimeSeries<T> right,
         MissingValuePolicy policy = MissingValuePolicy.Intersection)
         where T : struct, INumber<T>
     {
         EnsureCompatible(left, right);
-        return MergeSparse(left, right, policy, static (a, b) => a / b);
+        return MergeSparseCompatibility(left, right, policy, static (a, b) => a / b);
     }
 
-    public static SortedArrayTimeSeries<T> Multiply<T>(IReadOnlySparseTimeSeries<T> source, T scalar)
+    public static bool TryDivideAsFixedSlotTimeSeries<T>(
+        IReadOnlyTimeSeries<T> left,
+        IReadOnlyTimeSeries<T> right,
+        out FixedSlotTimeSeries<T>? result,
+        MissingValuePolicy policy = MissingValuePolicy.Intersection)
         where T : struct, INumber<T>
-        => TransformSparse(source, static (value, operand) => value * operand, scalar);
+        => TryBinaryAsSparseTarget(left, right, policy, TimeSeriesSpecializationTarget.FixedSlot, static (a, b) => a / b,
+            ToFixedSlotTimeSeries, out result);
 
-    public static SortedArrayTimeSeries<T> Add<T>(IReadOnlySparseTimeSeries<T> source, T scalar)
+    public static bool TryDivideAsDynamicSlotTimeSeries<T>(
+        IReadOnlyTimeSeries<T> left,
+        IReadOnlyTimeSeries<T> right,
+        out DynamicSlotTimeSeries<T>? result,
+        MissingValuePolicy policy = MissingValuePolicy.Intersection)
         where T : struct, INumber<T>
-        => TransformSparse(source, static (value, operand) => value + operand, scalar);
+        => TryBinaryAsSparseTarget(left, right, policy, TimeSeriesSpecializationTarget.DynamicSlot, static (a, b) => a / b,
+            ToDynamicSlotTimeSeries, out result);
 
-    public static SortedArrayTimeSeries<T> Divide<T>(IReadOnlySparseTimeSeries<T> source, T scalar)
+    public static bool TryDivideAsBoundedStepwiseTimeSeries<T>(
+        IReadOnlyTimeSeries<T> left,
+        IReadOnlyTimeSeries<T> right,
+        out StepwiseTimeSeries<T>? result,
+        MissingValuePolicy policy = MissingValuePolicy.Intersection)
         where T : struct, INumber<T>
-        => TransformSparse(source, static (value, operand) => value / operand, scalar);
+        => TryBinaryAsBoundedStepwiseTarget(left, right, policy, static (a, b) => a / b, out result);
+
+    public static IReadOnlySparseTimeSeries<T> Divide<T>(
+        IReadOnlySparseTimeSeries<T> left,
+        IBoundedStepwiseTimeSeries<T> right,
+        MissingValuePolicy policy = MissingValuePolicy.Intersection)
+        where T : struct, INumber<T>
+    {
+        EnsureCompatible(left, right);
+        return MergeSparseWithBoundedStepwise(left, right, policy, static (a, b) => a / b);
+    }
+
+    public static IReadOnlySparseTimeSeries<T> Divide<T>(
+        IBoundedStepwiseTimeSeries<T> left,
+        IReadOnlySparseTimeSeries<T> right,
+        MissingValuePolicy policy = MissingValuePolicy.Intersection)
+        where T : struct, INumber<T>
+    {
+        EnsureCompatible(left, right);
+        return MergeBoundedStepwiseWithSparse(left, right, policy, static (a, b) => a / b);
+    }
+
+    public static IReadOnlySparseTimeSeries<T> Multiply<T>(IReadOnlySparseTimeSeries<T> source, T scalar)
+        where T : struct, INumber<T>
+        => TransformSparseCompatibility(source, static (value, operand) => value * operand, scalar);
+
+    public static IReadOnlySparseTimeSeries<T> Add<T>(IReadOnlySparseTimeSeries<T> source, T scalar)
+        where T : struct, INumber<T>
+        => TransformSparseCompatibility(source, static (value, operand) => value + operand, scalar);
+
+    public static IReadOnlySparseTimeSeries<T> Divide<T>(IReadOnlySparseTimeSeries<T> source, T scalar)
+        where T : struct, INumber<T>
+        => TransformSparseCompatibility(source, static (value, operand) => value / operand, scalar);
+
+    public static IReadOnlySparseTimeSeries<T> Add<T>(
+        IReadOnlySparseTimeSeries<T> left,
+        IBoundedStepwiseTimeSeries<T> right,
+        MissingValuePolicy policy = MissingValuePolicy.Intersection)
+        where T : struct, INumber<T>
+    {
+        EnsureCompatible(left, right);
+        return MergeSparseWithBoundedStepwise(left, right, policy, static (a, b) => a + b);
+    }
+
+    public static IReadOnlySparseTimeSeries<T> Add<T>(
+        IBoundedStepwiseTimeSeries<T> left,
+        IReadOnlySparseTimeSeries<T> right,
+        MissingValuePolicy policy = MissingValuePolicy.Intersection)
+        where T : struct, INumber<T>
+    {
+        EnsureCompatible(left, right);
+        return MergeBoundedStepwiseWithSparse(left, right, policy, static (a, b) => a + b);
+    }
 
     public static StepwiseTimeSeries<T> Add<T>(
         IBoundedStepwiseTimeSeries<T> left,
@@ -133,6 +317,66 @@ public static class TimeSeriesMath
         return MergeRegular(left, right, policy, static (a, b) => a + b);
     }
 
+    public static IReadOnlySparseTimeSeries<T> Add<T>(
+        FixedSlotTimeSeries<T> left,
+        SortedArrayTimeSeries<T> right,
+        MissingValuePolicy policy = MissingValuePolicy.Intersection)
+        where T : struct, INumber<T>
+    {
+        EnsureCompatible(left, right);
+        return MergeSparseCompatibility(left, right, policy, static (a, b) => a + b);
+    }
+
+    public static IReadOnlySparseTimeSeries<T> Add<T>(
+        SortedArrayTimeSeries<T> left,
+        FixedSlotTimeSeries<T> right,
+        MissingValuePolicy policy = MissingValuePolicy.Intersection)
+        where T : struct, INumber<T>
+    {
+        EnsureCompatible(left, right);
+        return MergeSparseCompatibility(left, right, policy, static (a, b) => a + b);
+    }
+
+    public static IReadOnlySparseTimeSeries<T> Add<T>(
+        FixedSlotTimeSeries<T> left,
+        DynamicSlotTimeSeries<T> right,
+        MissingValuePolicy policy = MissingValuePolicy.Intersection)
+        where T : struct, INumber<T>
+    {
+        EnsureCompatible(left, right);
+        return MergeSparseCompatibility(left, right, policy, static (a, b) => a + b);
+    }
+
+    public static IReadOnlySparseTimeSeries<T> Add<T>(
+        DynamicSlotTimeSeries<T> left,
+        FixedSlotTimeSeries<T> right,
+        MissingValuePolicy policy = MissingValuePolicy.Intersection)
+        where T : struct, INumber<T>
+    {
+        EnsureCompatible(left, right);
+        return MergeSparseCompatibility(left, right, policy, static (a, b) => a + b);
+    }
+
+    public static IReadOnlySparseTimeSeries<T> Add<T>(
+        SortedArrayTimeSeries<T> left,
+        DynamicSlotTimeSeries<T> right,
+        MissingValuePolicy policy = MissingValuePolicy.Intersection)
+        where T : struct, INumber<T>
+    {
+        EnsureCompatible(left, right);
+        return MergeSparseCompatibility(left, right, policy, static (a, b) => a + b);
+    }
+
+    public static IReadOnlySparseTimeSeries<T> Add<T>(
+        DynamicSlotTimeSeries<T> left,
+        SortedArrayTimeSeries<T> right,
+        MissingValuePolicy policy = MissingValuePolicy.Intersection)
+        where T : struct, INumber<T>
+    {
+        EnsureCompatible(left, right);
+        return MergeSparseCompatibility(left, right, policy, static (a, b) => a + b);
+    }
+
     public static FixedSlotTimeSeries<T> Subtract<T>(
         FixedSlotTimeSeries<T> left,
         FixedSlotTimeSeries<T> right,
@@ -141,6 +385,66 @@ public static class TimeSeriesMath
     {
         EnsureCompatible(left, right);
         return MergeRegular(left, right, policy, static (a, b) => a - b);
+    }
+
+    public static IReadOnlySparseTimeSeries<T> Subtract<T>(
+        FixedSlotTimeSeries<T> left,
+        SortedArrayTimeSeries<T> right,
+        MissingValuePolicy policy = MissingValuePolicy.Intersection)
+        where T : struct, INumber<T>
+    {
+        EnsureCompatible(left, right);
+        return MergeSparseCompatibility(left, right, policy, static (a, b) => a - b);
+    }
+
+    public static IReadOnlySparseTimeSeries<T> Subtract<T>(
+        SortedArrayTimeSeries<T> left,
+        FixedSlotTimeSeries<T> right,
+        MissingValuePolicy policy = MissingValuePolicy.Intersection)
+        where T : struct, INumber<T>
+    {
+        EnsureCompatible(left, right);
+        return MergeSparseCompatibility(left, right, policy, static (a, b) => a - b);
+    }
+
+    public static IReadOnlySparseTimeSeries<T> Subtract<T>(
+        FixedSlotTimeSeries<T> left,
+        DynamicSlotTimeSeries<T> right,
+        MissingValuePolicy policy = MissingValuePolicy.Intersection)
+        where T : struct, INumber<T>
+    {
+        EnsureCompatible(left, right);
+        return MergeSparseCompatibility(left, right, policy, static (a, b) => a - b);
+    }
+
+    public static IReadOnlySparseTimeSeries<T> Subtract<T>(
+        DynamicSlotTimeSeries<T> left,
+        FixedSlotTimeSeries<T> right,
+        MissingValuePolicy policy = MissingValuePolicy.Intersection)
+        where T : struct, INumber<T>
+    {
+        EnsureCompatible(left, right);
+        return MergeSparseCompatibility(left, right, policy, static (a, b) => a - b);
+    }
+
+    public static IReadOnlySparseTimeSeries<T> Subtract<T>(
+        SortedArrayTimeSeries<T> left,
+        DynamicSlotTimeSeries<T> right,
+        MissingValuePolicy policy = MissingValuePolicy.Intersection)
+        where T : struct, INumber<T>
+    {
+        EnsureCompatible(left, right);
+        return MergeSparseCompatibility(left, right, policy, static (a, b) => a - b);
+    }
+
+    public static IReadOnlySparseTimeSeries<T> Subtract<T>(
+        DynamicSlotTimeSeries<T> left,
+        SortedArrayTimeSeries<T> right,
+        MissingValuePolicy policy = MissingValuePolicy.Intersection)
+        where T : struct, INumber<T>
+    {
+        EnsureCompatible(left, right);
+        return MergeSparseCompatibility(left, right, policy, static (a, b) => a - b);
     }
 
     public static FixedSlotTimeSeries<T> Multiply<T>(
@@ -153,6 +457,66 @@ public static class TimeSeriesMath
         return MergeRegular(left, right, policy, static (a, b) => a * b);
     }
 
+    public static IReadOnlySparseTimeSeries<T> Multiply<T>(
+        FixedSlotTimeSeries<T> left,
+        SortedArrayTimeSeries<T> right,
+        MissingValuePolicy policy = MissingValuePolicy.Intersection)
+        where T : struct, INumber<T>
+    {
+        EnsureCompatible(left, right);
+        return MergeSparseCompatibility(left, right, policy, static (a, b) => a * b);
+    }
+
+    public static IReadOnlySparseTimeSeries<T> Multiply<T>(
+        SortedArrayTimeSeries<T> left,
+        FixedSlotTimeSeries<T> right,
+        MissingValuePolicy policy = MissingValuePolicy.Intersection)
+        where T : struct, INumber<T>
+    {
+        EnsureCompatible(left, right);
+        return MergeSparseCompatibility(left, right, policy, static (a, b) => a * b);
+    }
+
+    public static IReadOnlySparseTimeSeries<T> Multiply<T>(
+        FixedSlotTimeSeries<T> left,
+        DynamicSlotTimeSeries<T> right,
+        MissingValuePolicy policy = MissingValuePolicy.Intersection)
+        where T : struct, INumber<T>
+    {
+        EnsureCompatible(left, right);
+        return MergeSparseCompatibility(left, right, policy, static (a, b) => a * b);
+    }
+
+    public static IReadOnlySparseTimeSeries<T> Multiply<T>(
+        DynamicSlotTimeSeries<T> left,
+        FixedSlotTimeSeries<T> right,
+        MissingValuePolicy policy = MissingValuePolicy.Intersection)
+        where T : struct, INumber<T>
+    {
+        EnsureCompatible(left, right);
+        return MergeSparseCompatibility(left, right, policy, static (a, b) => a * b);
+    }
+
+    public static IReadOnlySparseTimeSeries<T> Multiply<T>(
+        SortedArrayTimeSeries<T> left,
+        DynamicSlotTimeSeries<T> right,
+        MissingValuePolicy policy = MissingValuePolicy.Intersection)
+        where T : struct, INumber<T>
+    {
+        EnsureCompatible(left, right);
+        return MergeSparseCompatibility(left, right, policy, static (a, b) => a * b);
+    }
+
+    public static IReadOnlySparseTimeSeries<T> Multiply<T>(
+        DynamicSlotTimeSeries<T> left,
+        SortedArrayTimeSeries<T> right,
+        MissingValuePolicy policy = MissingValuePolicy.Intersection)
+        where T : struct, INumber<T>
+    {
+        EnsureCompatible(left, right);
+        return MergeSparseCompatibility(left, right, policy, static (a, b) => a * b);
+    }
+
     public static FixedSlotTimeSeries<T> Divide<T>(
         FixedSlotTimeSeries<T> left,
         FixedSlotTimeSeries<T> right,
@@ -161,6 +525,66 @@ public static class TimeSeriesMath
     {
         EnsureCompatible(left, right);
         return MergeRegular(left, right, policy, static (a, b) => a / b);
+    }
+
+    public static IReadOnlySparseTimeSeries<T> Divide<T>(
+        FixedSlotTimeSeries<T> left,
+        SortedArrayTimeSeries<T> right,
+        MissingValuePolicy policy = MissingValuePolicy.Intersection)
+        where T : struct, INumber<T>
+    {
+        EnsureCompatible(left, right);
+        return MergeSparseCompatibility(left, right, policy, static (a, b) => a / b);
+    }
+
+    public static IReadOnlySparseTimeSeries<T> Divide<T>(
+        SortedArrayTimeSeries<T> left,
+        FixedSlotTimeSeries<T> right,
+        MissingValuePolicy policy = MissingValuePolicy.Intersection)
+        where T : struct, INumber<T>
+    {
+        EnsureCompatible(left, right);
+        return MergeSparseCompatibility(left, right, policy, static (a, b) => a / b);
+    }
+
+    public static IReadOnlySparseTimeSeries<T> Divide<T>(
+        FixedSlotTimeSeries<T> left,
+        DynamicSlotTimeSeries<T> right,
+        MissingValuePolicy policy = MissingValuePolicy.Intersection)
+        where T : struct, INumber<T>
+    {
+        EnsureCompatible(left, right);
+        return MergeSparseCompatibility(left, right, policy, static (a, b) => a / b);
+    }
+
+    public static IReadOnlySparseTimeSeries<T> Divide<T>(
+        DynamicSlotTimeSeries<T> left,
+        FixedSlotTimeSeries<T> right,
+        MissingValuePolicy policy = MissingValuePolicy.Intersection)
+        where T : struct, INumber<T>
+    {
+        EnsureCompatible(left, right);
+        return MergeSparseCompatibility(left, right, policy, static (a, b) => a / b);
+    }
+
+    public static IReadOnlySparseTimeSeries<T> Divide<T>(
+        SortedArrayTimeSeries<T> left,
+        DynamicSlotTimeSeries<T> right,
+        MissingValuePolicy policy = MissingValuePolicy.Intersection)
+        where T : struct, INumber<T>
+    {
+        EnsureCompatible(left, right);
+        return MergeSparseCompatibility(left, right, policy, static (a, b) => a / b);
+    }
+
+    public static IReadOnlySparseTimeSeries<T> Divide<T>(
+        DynamicSlotTimeSeries<T> left,
+        SortedArrayTimeSeries<T> right,
+        MissingValuePolicy policy = MissingValuePolicy.Intersection)
+        where T : struct, INumber<T>
+    {
+        EnsureCompatible(left, right);
+        return MergeSparseCompatibility(left, right, policy, static (a, b) => a / b);
     }
 
     public static FixedSlotTimeSeries<T> Multiply<T>(FixedSlotTimeSeries<T> input, T scalar)
@@ -599,6 +1023,73 @@ public static class TimeSeriesMath
         return CreateSparseResult(source.Period, points);
     }
 
+    private static IReadOnlySparseTimeSeries<T> MergeSparseCompatibility<T>(
+        IReadOnlySparseTimeSeries<T> left,
+        IReadOnlySparseTimeSeries<T> right,
+        MissingValuePolicy policy,
+        Func<T, T, T> op)
+        where T : struct, INumber<T>
+        => MergeSparse(left, right, policy, op);
+
+    private static IReadOnlySparseTimeSeries<T> TransformSparseCompatibility<T>(
+        IReadOnlySparseTimeSeries<T> source,
+        Func<T, T, T> op,
+        T operand)
+        where T : struct, INumber<T>
+        => TransformSparse(source, op, operand);
+
+    private static IReadOnlySparseTimeSeries<T> MergeSparseWithBoundedStepwise<T>(
+        IReadOnlySparseTimeSeries<T> sparse,
+        IBoundedStepwiseTimeSeries<T> stepwise,
+        MissingValuePolicy policy,
+        Func<T, T, T> op)
+        where T : struct, INumber<T>
+    {
+        var points = new List<TimeSeriesPoint<T>>(sparse.ExplicitPointCount);
+        foreach (var point in sparse.GetPoints())
+        {
+            var hasStepwise = stepwise.TryGetValue(point.Timestamp, out var stepwiseValue);
+            switch (policy)
+            {
+                case MissingValuePolicy.Intersection when !hasStepwise:
+                    continue;
+                case MissingValuePolicy.Throw when !hasStepwise:
+                    throw new InvalidOperationException(
+                        $"Timestamp {point.Timestamp:O} exists in sparse input but not bounded stepwise logical range.");
+            }
+
+            points.Add(new TimeSeriesPoint<T>(point.Timestamp, op(point.Value, hasStepwise ? stepwiseValue : T.Zero)));
+        }
+
+        return CreateSparseResult(sparse.Period, points);
+    }
+
+    private static IReadOnlySparseTimeSeries<T> MergeBoundedStepwiseWithSparse<T>(
+        IBoundedStepwiseTimeSeries<T> stepwise,
+        IReadOnlySparseTimeSeries<T> sparse,
+        MissingValuePolicy policy,
+        Func<T, T, T> op)
+        where T : struct, INumber<T>
+    {
+        var points = new List<TimeSeriesPoint<T>>(sparse.ExplicitPointCount);
+        foreach (var point in sparse.GetPoints())
+        {
+            var hasStepwise = stepwise.TryGetValue(point.Timestamp, out var stepwiseValue);
+            switch (policy)
+            {
+                case MissingValuePolicy.Intersection when !hasStepwise:
+                    continue;
+                case MissingValuePolicy.Throw when !hasStepwise:
+                    throw new InvalidOperationException(
+                        $"Timestamp {point.Timestamp:O} exists in sparse input but not bounded stepwise logical range.");
+            }
+
+            points.Add(new TimeSeriesPoint<T>(point.Timestamp, op(hasStepwise ? stepwiseValue : T.Zero, point.Value)));
+        }
+
+        return CreateSparseResult(stepwise.Period, points);
+    }
+
     private static StepwiseTimeSeries<T> MergeStepwise<T>(
         IBoundedStepwiseTimeSeries<T> left,
         IBoundedStepwiseTimeSeries<T> right,
@@ -770,6 +1261,151 @@ public static class TimeSeriesMath
         return result;
     }
 
+    private static bool TryBinaryAsSparseTarget<T, TResult>(
+        IReadOnlyTimeSeries<T> left,
+        IReadOnlyTimeSeries<T> right,
+        MissingValuePolicy policy,
+        TimeSeriesSpecializationTarget target,
+        Func<T, T, T> op,
+        Func<IReadOnlySparseTimeSeries<T>, TResult> converter,
+        out TResult? result)
+        where T : struct, INumber<T>
+        where TResult : class, IReadOnlyTimeSeries<T>
+    {
+        EnsureCompatible(left, right);
+        if (!TryValidateBinarySpecialization(left, right, target))
+        {
+            result = null;
+            return false;
+        }
+
+        result = converter(ExecuteSparseBinaryOperation(left, right, policy, op));
+        return true;
+    }
+
+    private static bool TryBinaryAsBoundedStepwiseTarget<T>(
+        IReadOnlyTimeSeries<T> left,
+        IReadOnlyTimeSeries<T> right,
+        MissingValuePolicy policy,
+        Func<T, T, T> op,
+        out StepwiseTimeSeries<T>? result)
+        where T : struct, INumber<T>
+    {
+        EnsureCompatible(left, right);
+        if (!TryValidateBinarySpecialization(left, right, TimeSeriesSpecializationTarget.BoundedStepwise))
+        {
+            result = null;
+            return false;
+        }
+
+        result = ExecuteBoundedStepwiseBinaryOperation(left, right, policy, op);
+        return true;
+    }
+
+    private static SortedArrayTimeSeries<T> ExecuteSparseBinaryOperation<T>(
+        IReadOnlyTimeSeries<T> left,
+        IReadOnlyTimeSeries<T> right,
+        MissingValuePolicy policy,
+        Func<T, T, T> op)
+        where T : struct, INumber<T>
+        => (left, right) switch
+        {
+            (IReadOnlySparseTimeSeries<T> sparseLeft, IReadOnlySparseTimeSeries<T> sparseRight) =>
+                MergeSparse(sparseLeft, sparseRight, policy, op),
+            (IReadOnlySparseTimeSeries<T> sparseLeft, IBoundedStepwiseTimeSeries<T> stepwiseRight) =>
+                (SortedArrayTimeSeries<T>)MergeSparseWithBoundedStepwise(sparseLeft, stepwiseRight, policy, op),
+            (IBoundedStepwiseTimeSeries<T> stepwiseLeft, IReadOnlySparseTimeSeries<T> sparseRight) =>
+                (SortedArrayTimeSeries<T>)MergeBoundedStepwiseWithSparse(stepwiseLeft, sparseRight, policy, op),
+            _ => throw new InvalidOperationException("Sparse specialization requires sparse arithmetic semantics.")
+        };
+
+    private static StepwiseTimeSeries<T> ExecuteBoundedStepwiseBinaryOperation<T>(
+        IReadOnlyTimeSeries<T> left,
+        IReadOnlyTimeSeries<T> right,
+        MissingValuePolicy policy,
+        Func<T, T, T> op)
+        where T : struct, INumber<T>
+    {
+        if (left is not IBoundedStepwiseTimeSeries<T> stepwiseLeft || right is not IBoundedStepwiseTimeSeries<T> stepwiseRight)
+            throw new InvalidOperationException("Bounded stepwise specialization requires bounded stepwise arithmetic semantics.");
+
+        return MergeStepwise(stepwiseLeft, stepwiseRight, policy, op);
+    }
+
+    internal static bool TryValidateSpecialization<T>(
+        IReadOnlyTimeSeries<T> source,
+        Period resultPeriod,
+        TimeSeriesSpecializationTarget target)
+        where T : struct, INumber<T>
+        => IsSemanticallyValidTarget(ClassifySemanticFamily(source), target, resultPeriod);
+
+    private static bool TryValidateBinarySpecialization<T>(
+        IReadOnlyTimeSeries<T> left,
+        IReadOnlyTimeSeries<T> right,
+        TimeSeriesSpecializationTarget target)
+        where T : struct, INumber<T>
+        => IsSemanticallyValidTarget(ClassifyBinarySemanticFamily(left, right), target, left.Period);
+
+    private static TimeSeriesSemanticFamily ClassifyBinarySemanticFamily<T>(IReadOnlyTimeSeries<T> left, IReadOnlyTimeSeries<T> right)
+        where T : struct, INumber<T>
+    {
+        var leftFamily = ClassifySemanticFamily(left);
+        var rightFamily = ClassifySemanticFamily(right);
+
+        if (leftFamily == TimeSeriesSemanticFamily.Sparse || rightFamily == TimeSeriesSemanticFamily.Sparse)
+            return TimeSeriesSemanticFamily.Sparse;
+
+        if (leftFamily == TimeSeriesSemanticFamily.BoundedStepwise && rightFamily == TimeSeriesSemanticFamily.BoundedStepwise)
+            return TimeSeriesSemanticFamily.BoundedStepwise;
+
+        throw new InvalidOperationException("Unsupported time series family combination.");
+    }
+
+    internal static DynamicSlotTimeSeries<T> ToDynamicSlotTimeSeries<T>(IReadOnlySparseTimeSeries<T> source)
+        where T : struct, INumber<T>
+    {
+        var result = new DynamicSlotTimeSeries<T>(source.Period, AlignMode.Strict, source.ExplicitPointCount);
+        foreach (var point in source.GetPoints())
+            result[point.Timestamp] = point.Value;
+
+        return result;
+    }
+
+    internal static FixedSlotTimeSeries<T> ToFixedSlotTimeSeries<T>(IReadOnlySparseTimeSeries<T> source)
+        where T : struct, INumber<T>
+    {
+        var result = new FixedSlotTimeSeries<T>(source.Period, source.ExplicitPointCount);
+        foreach (var point in source.GetPoints())
+            result[point.Timestamp] = point.Value;
+
+        return result;
+    }
+
+    private static TimeSeriesSemanticFamily ClassifySemanticFamily<T>(IReadOnlyTimeSeries<T> source)
+        where T : struct, INumber<T>
+        => source switch
+        {
+            IReadOnlySparseTimeSeries<T> => TimeSeriesSemanticFamily.Sparse,
+            IBoundedStepwiseTimeSeries<T> => TimeSeriesSemanticFamily.BoundedStepwise,
+            _ => throw new InvalidOperationException("Unsupported time series family.")
+        };
+
+    private static bool IsSemanticallyValidTarget(
+        TimeSeriesSemanticFamily semanticFamily,
+        TimeSeriesSpecializationTarget target,
+        Period resultPeriod)
+        => target switch
+        {
+            TimeSeriesSpecializationTarget.FixedSlot =>
+                semanticFamily == TimeSeriesSemanticFamily.Sparse &&
+                PeriodMath.TryGetFixedTicks(resultPeriod, out _),
+            TimeSeriesSpecializationTarget.DynamicSlot =>
+                semanticFamily == TimeSeriesSemanticFamily.Sparse,
+            TimeSeriesSpecializationTarget.BoundedStepwise =>
+                semanticFamily == TimeSeriesSemanticFamily.BoundedStepwise,
+            _ => false
+        };
+
     private static void EnsureCompatible<T>(IReadOnlyTimeSeries<T> left, IReadOnlyTimeSeries<T> right)
         where T : struct, INumber<T>
     {
@@ -932,5 +1568,18 @@ public static class TimeSeriesMath
     {
         if (left.Period != right.Period)
             throw new InvalidOperationException("Series periods must match.");
+    }
+
+    internal enum TimeSeriesSpecializationTarget
+    {
+        FixedSlot,
+        DynamicSlot,
+        BoundedStepwise
+    }
+
+    private enum TimeSeriesSemanticFamily
+    {
+        Sparse,
+        BoundedStepwise
     }
 }

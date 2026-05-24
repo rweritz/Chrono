@@ -7,6 +7,10 @@ public interface IReadOnlyTimeSeries<T>
 {
     Period Period { get; }
 
+    DateTimeOffset MinDate { get; }
+
+    DateTimeOffset MaxDate { get; }
+
     bool TryGetValue(DateTimeOffset timestamp, out T value);
 
     T this[DateTimeOffset timestamp] { get; }
@@ -26,10 +30,6 @@ public interface IReadOnlySparseTimeSeries<T> : IReadOnlyTimeSeries<T>
     where T : struct, INumber<T>
 {
     int ExplicitPointCount { get; }
-
-    DateTimeOffset MinDate { get; }
-
-    DateTimeOffset MaxDate { get; }
 
     IEnumerable<TimeSeriesPoint<T>> GetPoints();
 }

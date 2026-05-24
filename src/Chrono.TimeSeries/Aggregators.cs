@@ -100,3 +100,24 @@ public struct CountAggregator<T> : IAggregator<T, int>
 
     public int Complete(int count) => _count;
 }
+
+internal struct IdentityAggregator<T> : IAggregator<T, T>
+    where T : struct, INumber<T>
+{
+    private T _value;
+
+    public void Reset() => _value = T.Zero;
+
+    public void Add(T value) => _value = value;
+
+    public T Complete(int count)
+    {
+        if (count != 1)
+        {
+            throw new InvalidOperationException(
+                "Explicit resampling requires exactly one source value per target bucket. Use aggregation when combining multiple source values.");
+        }
+
+        return _value;
+    }
+}

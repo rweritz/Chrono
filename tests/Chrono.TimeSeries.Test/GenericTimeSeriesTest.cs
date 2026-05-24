@@ -41,6 +41,30 @@ public class GenericTimeSeriesTest
     }
 
     [Fact]
+    public void ReadOnlyContract_ShouldExposeExplicitPointBoundsWithoutReplacingStepwiseLogicalRange()
+    {
+        var sparseFirst = new DateTimeOffset(2022, 2, 6, 5, 0, 0, TimeSpan.Zero);
+        var sparseLast = sparseFirst.AddMinutes(10);
+
+        var sparseSeries = new SortedArrayTimeSeries<int>(Period.FiveMinutes);
+        sparseSeries[sparseFirst] = 5;
+        sparseSeries[sparseLast] = 10;
+        IReadOnlyTimeSeries<int> sparse = sparseSeries;
+
+        var logicalStart = new DateTimeOffset(2024, 1, 1, 0, 0, 0, TimeSpan.Zero);
+        var logicalEnd = logicalStart.AddMinutes(10);
+        IBoundedStepwiseTimeSeries<int> stepwise = new StepwiseTimeSeries<int>(Period.FiveMinutes, logicalStart, logicalEnd, 7);
+        IReadOnlyTimeSeries<int> commonStepwise = stepwise;
+
+        sparse.MinDate.Should().Be(sparseFirst);
+        sparse.MaxDate.Should().Be(sparseLast);
+        commonStepwise.MinDate.Should().Be(logicalStart);
+        commonStepwise.MaxDate.Should().Be(logicalEnd);
+        stepwise.LogicalRangeStart.Should().Be(logicalStart);
+        stepwise.LogicalRangeEnd.Should().Be(logicalEnd);
+    }
+
+    [Fact]
     public void SparseImplementations_ShouldMaterializeExplicitPointsForEachCoveredSlotViaSegmentWrite()
     {
         var first = new DateTimeOffset(2022, 2, 6, 5, 0, 0, TimeSpan.Zero);
