@@ -2,6 +2,8 @@
 
 Chrono provides sparse time series and bounded stepwise time series with family-specific count and enumeration semantics.
 
+At the shared read-only level, `IReadOnlyTimeSeries<T>` exposes `MinDate` and `MaxDate` as explicit-point bounds for compatibility-style checks. For sparse series those bounds describe the first and last stored points. For bounded stepwise series they describe the stored change-point bounds, while `LogicalRangeStart` and `LogicalRangeEnd` remain the family-specific way to talk about dense logical coverage.
+
 ## Sparse time series
 
 Sparse time series only contain explicitly stored points. They implement `ISparseTimeSeries<T>`, expose `ExplicitPointCount`, and enumerate stored points through `GetPoints()`.
@@ -32,7 +34,7 @@ Calendar-aware slot-indexed storage for all periods except `NonStandard`.
 
 ## Bounded stepwise time series
 
-`StepwiseTimeSeries<T>` implements `IBoundedStepwiseTimeSeries<T>`. It exposes an explicit logical range through `LogicalRangeStart`, `LogicalRangeEnd`, and `LogicalSlotCount`, while stored change-points are surfaced separately through `ChangePointCount` and `GetChangePoints()`.
+`StepwiseTimeSeries<T>` implements `IBoundedStepwiseTimeSeries<T>`. It exposes an explicit logical range through `LogicalRangeStart`, `LogicalRangeEnd`, and `LogicalSlotCount`, while stored change-points are surfaced separately through `ChangePointCount` and `GetChangePoints()`. The shared `MinDate`/`MaxDate` metadata does not replace that logical-range vocabulary; use the logical-range members when you need dense coverage semantics.
 
 - Dense logical reads within the logical range
 - Canonical compression of stored change-points

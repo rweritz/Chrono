@@ -36,6 +36,10 @@ public sealed class StepwiseTimeSeries<T> : IBoundedStepwiseTimeSeries<T>
 
     public Period Period { get; }
 
+    public DateTimeOffset MinDate => CalendarSlotMath.FromSlot(_changePointSlots[0], Period);
+
+    public DateTimeOffset MaxDate => CalendarSlotMath.FromSlot(_changePointSlots[^1], Period);
+
     public DateTimeOffset LogicalRangeStart => CalendarSlotMath.FromSlot(_logicalRangeStartSlot, Period);
 
     public DateTimeOffset LogicalRangeEnd => CalendarSlotMath.FromSlot(_logicalRangeEndSlot, Period);
