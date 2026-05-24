@@ -35,6 +35,10 @@ public class TimeSeriesMathTest
             .ReturnType.Should().Be(typeof(IReadOnlySparseTimeSeries<int>));
         GetSparseBinaryOverload(methodName, typeof(DynamicSlotTimeSeries<int>), typeof(FixedSlotTimeSeries<int>))
             .ReturnType.Should().Be(typeof(IReadOnlySparseTimeSeries<int>));
+        GetSparseBinaryOverload(methodName, typeof(IReadOnlySparseTimeSeries<int>), typeof(IBoundedStepwiseTimeSeries<int>))
+            .ReturnType.Should().Be(typeof(IReadOnlySparseTimeSeries<int>));
+        GetSparseBinaryOverload(methodName, typeof(IBoundedStepwiseTimeSeries<int>), typeof(IReadOnlySparseTimeSeries<int>))
+            .ReturnType.Should().Be(typeof(IReadOnlySparseTimeSeries<int>));
     }
 
     [Fact]
@@ -198,6 +202,65 @@ public class TimeSeriesMathTest
         intersection.MaxDate.Should().Be(middle);
         intersection[middle].Should().Be(8);
         throwOnMissing.Should().Throw<InvalidOperationException>();
+    }
+
+    [Fact]
+    public void SparseAndBoundedStepwiseMath_Intersection_ShouldPreserveSparsePoints()
+    {
+        var start = new DateTimeOffset(2024, 1, 1, 0, 0, 0, TimeSpan.Zero);
+        var middle = start.AddMinutes(5);
+        var end = start.AddMinutes(10);
+        var after = start.AddMinutes(15);
+        var sparse = new SortedArrayTimeSeries<int>(Period.FiveMinutes);
+        IBoundedStepwiseTimeSeries<int> stepwise = new StepwiseTimeSeries<int>(Period.FiveMinutes, middle, after, 10);
+
+        sparse[start] = 2;
+        sparse[middle] = 3;
+        sparse[end] = 5;
+
+        var result = TimeSeriesMath.Add(sparse, stepwise, MissingValuePolicy.Intersection);
+
+        result.Should().BeAssignableTo<IReadOnlySparseTimeSeries<int>>();
+        result.ExplicitPointCount.Should().Be(2);
+        result.GetPoints().Should().Equal(
+            new TimeSeriesPoint<int>(middle, 13),
+            new TimeSeriesPoint<int>(end, 15));
+    }
+
+    [Fact]
+    public void SparseAndBoundedStepwiseMath_UnionWithZero_ShouldNotDensifySparseResults()
+    {
+        var start = new DateTimeOffset(2024, 1, 1, 0, 0, 0, TimeSpan.Zero);
+        var middle = start.AddMinutes(5);
+        var end = start.AddMinutes(10);
+        IBoundedStepwiseTimeSeries<int> stepwise = new StepwiseTimeSeries<int>(Period.FiveMinutes, start, end, 10);
+        var sparse = new SortedArrayTimeSeries<int>(Period.FiveMinutes);
+
+        sparse[start] = 2;
+        sparse[end] = 3;
+
+        var result = TimeSeriesMath.Subtract(stepwise, sparse, MissingValuePolicy.UnionWithZero);
+
+        result.Should().BeAssignableTo<IReadOnlySparseTimeSeries<int>>();
+        result.ExplicitPointCount.Should().Be(2);
+        result.GetPoints().Should().Equal(
+            new TimeSeriesPoint<int>(start, 8),
+            new TimeSeriesPoint<int>(end, 7));
+        result.TryGetValue(middle, out _).Should().BeFalse();
+    }
+
+    [Fact]
+    public void SparseAndBoundedStepwiseMath_ShouldRequireExplicitPeriodCompatibility()
+    {
+        var timestamp = new DateTimeOffset(2024, 1, 1, 0, 0, 0, TimeSpan.Zero);
+        var sparse = new SortedArrayTimeSeries<int>(Period.FiveMinutes);
+        IBoundedStepwiseTimeSeries<int> stepwise = new StepwiseTimeSeries<int>(Period.Hour, timestamp, timestamp.AddHours(1), 10);
+
+        sparse[timestamp] = 2;
+
+        Action act = () => TimeSeriesMath.Multiply(sparse, stepwise, MissingValuePolicy.UnionWithZero);
+
+        act.Should().Throw<InvalidOperationException>().WithMessage("Periods must match.");
     }
 
     [Fact]

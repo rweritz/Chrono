@@ -25,6 +25,26 @@ public static class TimeSeriesMath
         return MergeSparseCompatibility(left, right, policy, static (a, b) => a - b);
     }
 
+    public static IReadOnlySparseTimeSeries<T> Subtract<T>(
+        IReadOnlySparseTimeSeries<T> left,
+        IBoundedStepwiseTimeSeries<T> right,
+        MissingValuePolicy policy = MissingValuePolicy.Intersection)
+        where T : struct, INumber<T>
+    {
+        EnsureCompatible(left, right);
+        return MergeSparseWithBoundedStepwise(left, right, policy, static (a, b) => a - b);
+    }
+
+    public static IReadOnlySparseTimeSeries<T> Subtract<T>(
+        IBoundedStepwiseTimeSeries<T> left,
+        IReadOnlySparseTimeSeries<T> right,
+        MissingValuePolicy policy = MissingValuePolicy.Intersection)
+        where T : struct, INumber<T>
+    {
+        EnsureCompatible(left, right);
+        return MergeBoundedStepwiseWithSparse(left, right, policy, static (a, b) => a - b);
+    }
+
     public static IReadOnlySparseTimeSeries<T> Multiply<T>(
         IReadOnlySparseTimeSeries<T> left,
         IReadOnlySparseTimeSeries<T> right,
@@ -35,6 +55,26 @@ public static class TimeSeriesMath
         return MergeSparseCompatibility(left, right, policy, static (a, b) => a * b);
     }
 
+    public static IReadOnlySparseTimeSeries<T> Multiply<T>(
+        IReadOnlySparseTimeSeries<T> left,
+        IBoundedStepwiseTimeSeries<T> right,
+        MissingValuePolicy policy = MissingValuePolicy.Intersection)
+        where T : struct, INumber<T>
+    {
+        EnsureCompatible(left, right);
+        return MergeSparseWithBoundedStepwise(left, right, policy, static (a, b) => a * b);
+    }
+
+    public static IReadOnlySparseTimeSeries<T> Multiply<T>(
+        IBoundedStepwiseTimeSeries<T> left,
+        IReadOnlySparseTimeSeries<T> right,
+        MissingValuePolicy policy = MissingValuePolicy.Intersection)
+        where T : struct, INumber<T>
+    {
+        EnsureCompatible(left, right);
+        return MergeBoundedStepwiseWithSparse(left, right, policy, static (a, b) => a * b);
+    }
+
     public static IReadOnlySparseTimeSeries<T> Divide<T>(
         IReadOnlySparseTimeSeries<T> left,
         IReadOnlySparseTimeSeries<T> right,
@@ -43,6 +83,26 @@ public static class TimeSeriesMath
     {
         EnsureCompatible(left, right);
         return MergeSparseCompatibility(left, right, policy, static (a, b) => a / b);
+    }
+
+    public static IReadOnlySparseTimeSeries<T> Divide<T>(
+        IReadOnlySparseTimeSeries<T> left,
+        IBoundedStepwiseTimeSeries<T> right,
+        MissingValuePolicy policy = MissingValuePolicy.Intersection)
+        where T : struct, INumber<T>
+    {
+        EnsureCompatible(left, right);
+        return MergeSparseWithBoundedStepwise(left, right, policy, static (a, b) => a / b);
+    }
+
+    public static IReadOnlySparseTimeSeries<T> Divide<T>(
+        IBoundedStepwiseTimeSeries<T> left,
+        IReadOnlySparseTimeSeries<T> right,
+        MissingValuePolicy policy = MissingValuePolicy.Intersection)
+        where T : struct, INumber<T>
+    {
+        EnsureCompatible(left, right);
+        return MergeBoundedStepwiseWithSparse(left, right, policy, static (a, b) => a / b);
     }
 
     public static IReadOnlySparseTimeSeries<T> Multiply<T>(IReadOnlySparseTimeSeries<T> source, T scalar)
@@ -56,6 +116,26 @@ public static class TimeSeriesMath
     public static IReadOnlySparseTimeSeries<T> Divide<T>(IReadOnlySparseTimeSeries<T> source, T scalar)
         where T : struct, INumber<T>
         => TransformSparseCompatibility(source, static (value, operand) => value / operand, scalar);
+
+    public static IReadOnlySparseTimeSeries<T> Add<T>(
+        IReadOnlySparseTimeSeries<T> left,
+        IBoundedStepwiseTimeSeries<T> right,
+        MissingValuePolicy policy = MissingValuePolicy.Intersection)
+        where T : struct, INumber<T>
+    {
+        EnsureCompatible(left, right);
+        return MergeSparseWithBoundedStepwise(left, right, policy, static (a, b) => a + b);
+    }
+
+    public static IReadOnlySparseTimeSeries<T> Add<T>(
+        IBoundedStepwiseTimeSeries<T> left,
+        IReadOnlySparseTimeSeries<T> right,
+        MissingValuePolicy policy = MissingValuePolicy.Intersection)
+        where T : struct, INumber<T>
+    {
+        EnsureCompatible(left, right);
+        return MergeBoundedStepwiseWithSparse(left, right, policy, static (a, b) => a + b);
+    }
 
     public static StepwiseTimeSeries<T> Add<T>(
         IBoundedStepwiseTimeSeries<T> left,
@@ -853,6 +933,58 @@ public static class TimeSeriesMath
         T operand)
         where T : struct, INumber<T>
         => TransformSparse(source, op, operand);
+
+    private static IReadOnlySparseTimeSeries<T> MergeSparseWithBoundedStepwise<T>(
+        IReadOnlySparseTimeSeries<T> sparse,
+        IBoundedStepwiseTimeSeries<T> stepwise,
+        MissingValuePolicy policy,
+        Func<T, T, T> op)
+        where T : struct, INumber<T>
+    {
+        var points = new List<TimeSeriesPoint<T>>(sparse.ExplicitPointCount);
+        foreach (var point in sparse.GetPoints())
+        {
+            var hasStepwise = stepwise.TryGetValue(point.Timestamp, out var stepwiseValue);
+            switch (policy)
+            {
+                case MissingValuePolicy.Intersection when !hasStepwise:
+                    continue;
+                case MissingValuePolicy.Throw when !hasStepwise:
+                    throw new InvalidOperationException(
+                        $"Timestamp {point.Timestamp:O} exists in sparse input but not bounded stepwise logical range.");
+            }
+
+            points.Add(new TimeSeriesPoint<T>(point.Timestamp, op(point.Value, hasStepwise ? stepwiseValue : T.Zero)));
+        }
+
+        return CreateSparseResult(sparse.Period, points);
+    }
+
+    private static IReadOnlySparseTimeSeries<T> MergeBoundedStepwiseWithSparse<T>(
+        IBoundedStepwiseTimeSeries<T> stepwise,
+        IReadOnlySparseTimeSeries<T> sparse,
+        MissingValuePolicy policy,
+        Func<T, T, T> op)
+        where T : struct, INumber<T>
+    {
+        var points = new List<TimeSeriesPoint<T>>(sparse.ExplicitPointCount);
+        foreach (var point in sparse.GetPoints())
+        {
+            var hasStepwise = stepwise.TryGetValue(point.Timestamp, out var stepwiseValue);
+            switch (policy)
+            {
+                case MissingValuePolicy.Intersection when !hasStepwise:
+                    continue;
+                case MissingValuePolicy.Throw when !hasStepwise:
+                    throw new InvalidOperationException(
+                        $"Timestamp {point.Timestamp:O} exists in sparse input but not bounded stepwise logical range.");
+            }
+
+            points.Add(new TimeSeriesPoint<T>(point.Timestamp, op(hasStepwise ? stepwiseValue : T.Zero, point.Value)));
+        }
+
+        return CreateSparseResult(stepwise.Period, points);
+    }
 
     private static StepwiseTimeSeries<T> MergeStepwise<T>(
         IBoundedStepwiseTimeSeries<T> left,

@@ -61,6 +61,7 @@ Scalar operations work on `FixedSlotTimeSeries<T>`, `SortedArrayTimeSeries<T>`, 
 The abstraction split is reflected in the math API:
 
 - `IReadOnlySparseTimeSeries<T>` inputs produce sparse `SortedArrayTimeSeries<T>` results that preserve explicit point presence.
+- Mixed `IReadOnlySparseTimeSeries<T>` × `IBoundedStepwiseTimeSeries<T>` inputs also produce sparse `SortedArrayTimeSeries<T>` results. Default cross-family arithmetic only evaluates sparse timestamps, so bounded stepwise inputs contribute values at those timestamps without densifying sparse gaps.
 - `IBoundedStepwiseTimeSeries<T>` inputs produce `StepwiseTimeSeries<T>` results that preserve dense logical reads across the resulting logical range.
 
 For bounded stepwise series, `MissingValuePolicy.UnionWithZero` requires overlapping or directly contiguous logical ranges. Disconnected logical ranges throw instead of inventing values across a gap.
