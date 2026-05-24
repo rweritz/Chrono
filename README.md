@@ -5,7 +5,8 @@ A high-performance time series library for .NET, built on .NET 10 and `System.Nu
 ## Features
 
 - **Generic numeric types** — works with `int`, `double`, `decimal`, and any `INumber<T>` type
-- **Three storage strategies** — `FixedSlotTimeSeries<T>`, `SortedArrayTimeSeries<T>`, `DynamicSlotTimeSeries<T>`
+- **Three sparse storage strategies** — `FixedSlotTimeSeries<T>`, `SortedArrayTimeSeries<T>`, `DynamicSlotTimeSeries<T>`
+- **Bounded stepwise series** — `StepwiseTimeSeries<T>` for dense logical reads with compressed change-points
 - **Calendar-aware storage** — `DynamicSlotTimeSeries<T>` with calendar-smart slot math for months, quarters, and years
 - **Period alignment** — built-in periods from 5 minutes to yearly, with automatic timestamp validation and optional truncation (`AlignMode`)
 - **Arithmetic operations** — element-wise Add, Subtract, Multiply, Divide between series, plus scalar operations
@@ -41,7 +42,7 @@ var scaled = TimeSeriesMath.Multiply(series, 2.0);
 For detailed guides and API explanations, see the [**full documentation**](docs/users/index.md):
 
 - [Getting Started](docs/users/getting-started.md) — installation & first time series
-- [Time Series Types](docs/users/time-series-types.md) — `FixedSlotTimeSeries<T>`, `SortedArrayTimeSeries<T>`, `DynamicSlotTimeSeries<T>`
+- [Time Series Types](docs/users/time-series-types.md) — sparse types plus `StepwiseTimeSeries<T>`
 - [Periods & Alignment](docs/users/periods-and-alignment.md) — period enum, validation, and slot math
 - [Arithmetic Operations](docs/users/arithmetic-operations.md) — binary & scalar math, missing value policies
 - [Aggregation](docs/users/aggregation.md) — Sum, Average, Min, Max, Count across time buckets
@@ -49,7 +50,7 @@ For detailed guides and API explanations, see the [**full documentation**](docs/
 
 ## Benchmarks
 
-Measured with [BenchmarkDotNet](https://github.com/dotnet/BenchmarkDotNet) on .NET 10.0, N = 10,000 data points (`double` series). See the [full benchmark analysis](docs/users/benchmarks.md) for details.
+Measured with [BenchmarkDotNet](https://github.com/dotnet/BenchmarkDotNet) on .NET 10.0, N = 10,000 data points (`double` series). Current benchmark coverage focuses on the three sparse storage strategies; see the [full benchmark analysis](docs/users/benchmarks.md) for details.
 
 ```
 BenchmarkDotNet v0.13.12, Windows 11 (10.0.26200.8037)
