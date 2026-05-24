@@ -52,6 +52,7 @@ var gapped = ChronoTimeSeriesGenerator
 ## Composite and waveform generators
 
 Use `TimeSeriesGenerator` when composing reusable generator objects. This example combines a linear trend with a sawtooth waveform, then removes deterministic gaps.
+The facade starts constant, random walk, linear trend, step function, seasonal, sawtooth, and impulse generators, each with storage shape selectors.
 
 ```csharp
 var baseline = TimeSeriesGenerator

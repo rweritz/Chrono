@@ -200,6 +200,43 @@ public sealed class ChronoTimeSeriesGeneratorTest
     }
 
     [Fact]
+    public void SeasonalFacadeBuildsDeterministicConfigurableCycle()
+    {
+        var start = new DateTimeOffset(2026, 6, 1, 0, 0, 0, TimeSpan.Zero);
+
+        var first = TimeSeriesGenerator
+            .Seasonal<double>(Period.Hour)
+            .WithStart(start)
+            .WithCount(5)
+            .WithSeed(17)
+            .WithAmplitude(10.0)
+            .WithCycleLength(4)
+            .WithBaseline(50.0)
+            .AsDynamicSlot()
+            .Build();
+
+        var second = TimeSeriesGenerator
+            .Seasonal<double>(Period.Hour)
+            .WithStart(start)
+            .WithCount(5)
+            .WithSeed(17)
+            .WithAmplitude(10.0)
+            .WithCycleLength(4)
+            .WithBaseline(50.0)
+            .AsDynamicSlot()
+            .Build();
+
+        first.Should().BeOfType<DynamicSlotTimeSeries<double>>();
+        first.GetPoints().Should().Equal(second.GetPoints());
+        var values = first.GetPoints().Select(point => point.Value).ToArray();
+        values[0].Should().BeApproximately(50.0, 0.000001);
+        values[1].Should().BeApproximately(60.0, 0.000001);
+        values[2].Should().BeApproximately(50.0, 0.000001);
+        values[3].Should().BeApproximately(40.0, 0.000001);
+        values[4].Should().BeApproximately(50.0, 0.000001);
+    }
+
+    [Fact]
     public void SawtoothFacadeBuildsRepeatingRamp()
     {
         var start = new DateTimeOffset(2026, 7, 1, 0, 0, 0, TimeSpan.Zero);
@@ -234,6 +271,30 @@ public sealed class ChronoTimeSeriesGeneratorTest
             .Impulse(baseline: 1.5, (2, 9.0), (4, -2.0))
             .Build();
 
+        series.GetPoints().Should().Equal(
+            new TimeSeriesPoint<double>(start, 1.5),
+            new TimeSeriesPoint<double>(start.AddMinutes(30), 1.5),
+            new TimeSeriesPoint<double>(start.AddMinutes(60), 9.0),
+            new TimeSeriesPoint<double>(start.AddMinutes(90), 1.5),
+            new TimeSeriesPoint<double>(start.AddMinutes(120), -2.0));
+    }
+
+    [Fact]
+    public void ImpulseFacadeBuildsRequestedShapeWithConfiguredSpikes()
+    {
+        var start = new DateTimeOffset(2026, 8, 1, 0, 0, 0, TimeSpan.Zero);
+
+        var series = TimeSeriesGenerator
+            .Impulse<double>(Period.HalfHour)
+            .WithStart(start)
+            .WithCount(5)
+            .WithBaseline(1.5)
+            .WithSpikes((2, 9.0), (4, -2.0))
+            .AsFixedSlot()
+            .Build();
+
+        series.Should().BeOfType<FixedSlotTimeSeries<double>>();
+        series.Period.Should().Be(Period.HalfHour);
         series.GetPoints().Should().Equal(
             new TimeSeriesPoint<double>(start, 1.5),
             new TimeSeriesPoint<double>(start.AddMinutes(30), 1.5),

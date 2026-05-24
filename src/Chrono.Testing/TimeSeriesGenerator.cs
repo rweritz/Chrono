@@ -37,9 +37,23 @@ public static class TimeSeriesGenerator
         new(period);
 
     /// <summary>
+    /// Starts a generator that emits a sinusoidal seasonal cycle.
+    /// </summary>
+    public static SeasonalTimeSeriesGeneratorBuilder<T> Seasonal<T>(Period period)
+        where T : struct, INumber<T> =>
+        new(period);
+
+    /// <summary>
     /// Starts a generator that emits a repeating sawtooth ramp.
     /// </summary>
     public static SawtoothTimeSeriesGeneratorBuilder<T> Sawtooth<T>(Period period)
+        where T : struct, INumber<T> =>
+        new(period);
+
+    /// <summary>
+    /// Starts a generator that emits a baseline with configured impulse spikes.
+    /// </summary>
+    public static ImpulseTimeSeriesGeneratorBuilder<T> Impulse<T>(Period period)
         where T : struct, INumber<T> =>
         new(period);
 
@@ -494,6 +508,149 @@ public sealed class StepFunctionTimeSeriesGeneratorBuilder<T>
 }
 
 /// <summary>
+/// Configures deterministic seasonal Chrono sparse series generation.
+/// </summary>
+public sealed class SeasonalTimeSeriesGeneratorBuilder<T>
+    : ITimeSeriesGenerator<T>
+    where T : struct, INumber<T>
+{
+    private readonly Period _period;
+    private DateTimeOffset _start;
+    private int _count;
+    private int _seed;
+    private T _amplitude = T.One;
+    private int _cycleLength = 1;
+    private T _baseline;
+    private T _noiseAmplitude;
+    private ChronoSeriesShape _shape = ChronoSeriesShape.SortedArray;
+
+    internal SeasonalTimeSeriesGeneratorBuilder(Period period)
+    {
+        _period = period;
+    }
+
+    /// <summary>
+    /// Sets the first generated timestamp.
+    /// </summary>
+    public SeasonalTimeSeriesGeneratorBuilder<T> WithStart(DateTimeOffset start)
+    {
+        _start = start;
+        return this;
+    }
+
+    /// <summary>
+    /// Sets the number of generated timestamps.
+    /// </summary>
+    public SeasonalTimeSeriesGeneratorBuilder<T> WithCount(int count)
+    {
+        if (count < 0)
+            throw new ArgumentOutOfRangeException(nameof(count), "Count must not be negative.");
+
+        _count = count;
+        return this;
+    }
+
+    /// <summary>
+    /// Sets the deterministic seed used for optional seasonal noise.
+    /// </summary>
+    public SeasonalTimeSeriesGeneratorBuilder<T> WithSeed(int seed)
+    {
+        _seed = seed;
+        return this;
+    }
+
+    /// <summary>
+    /// Sets the seasonal cycle amplitude.
+    /// </summary>
+    public SeasonalTimeSeriesGeneratorBuilder<T> WithAmplitude(T amplitude)
+    {
+        _amplitude = amplitude;
+        return this;
+    }
+
+    /// <summary>
+    /// Sets the number of generated timestamps in each cycle.
+    /// </summary>
+    public SeasonalTimeSeriesGeneratorBuilder<T> WithCycleLength(int cycleLength)
+    {
+        if (cycleLength <= 0)
+            throw new ArgumentOutOfRangeException(nameof(cycleLength), "Cycle length must be positive.");
+
+        _cycleLength = cycleLength;
+        return this;
+    }
+
+    /// <summary>
+    /// Sets the value added to every generated seasonal point.
+    /// </summary>
+    public SeasonalTimeSeriesGeneratorBuilder<T> WithBaseline(T baseline)
+    {
+        _baseline = baseline;
+        return this;
+    }
+
+    /// <summary>
+    /// Sets the maximum absolute optional noise added to each seasonal point.
+    /// </summary>
+    public SeasonalTimeSeriesGeneratorBuilder<T> WithNoiseAmplitude(T noiseAmplitude)
+    {
+        if (noiseAmplitude < T.Zero)
+            throw new ArgumentOutOfRangeException(nameof(noiseAmplitude), "Noise amplitude must not be negative.");
+
+        _noiseAmplitude = noiseAmplitude;
+        return this;
+    }
+
+    /// <summary>
+    /// Materializes a <see cref="SortedArrayTimeSeries{T}"/>.
+    /// </summary>
+    public SeasonalTimeSeriesGeneratorBuilder<T> AsSortedArray()
+    {
+        _shape = ChronoSeriesShape.SortedArray;
+        return this;
+    }
+
+    /// <summary>
+    /// Materializes a <see cref="FixedSlotTimeSeries{T}"/>.
+    /// </summary>
+    public SeasonalTimeSeriesGeneratorBuilder<T> AsFixedSlot()
+    {
+        _shape = ChronoSeriesShape.FixedSlot;
+        return this;
+    }
+
+    /// <summary>
+    /// Materializes a <see cref="DynamicSlotTimeSeries{T}"/>.
+    /// </summary>
+    public SeasonalTimeSeriesGeneratorBuilder<T> AsDynamicSlot()
+    {
+        _shape = ChronoSeriesShape.DynamicSlot;
+        return this;
+    }
+
+    /// <summary>
+    /// Materializes the configured Chrono sparse series.
+    /// </summary>
+    public ISparseTimeSeries<T> Build()
+    {
+        var series = TimeSeriesGeneratorBuilderSupport.CreateSparseSeries<T>(_shape, _period, _count);
+        var random = new Random(_seed);
+
+        for (var i = 0; i < _count; i++)
+        {
+            var seasonal = Math.Sin((Math.Tau * i) / _cycleLength) * double.CreateChecked(_amplitude);
+            var noise = _noiseAmplitude == T.Zero
+                ? 0.0
+                : ((random.NextDouble() * 2.0) - 1.0) * double.CreateChecked(_noiseAmplitude);
+            series[TimeSeriesGeneratorBuilderSupport.AddPeriod(_start, _period, i)] =
+                _baseline + T.CreateChecked(seasonal + noise);
+        }
+
+        return series;
+    }
+}
+
+/// <summary>
 /// Configures deterministic sawtooth Chrono sparse series generation.
 /// </summary>
 public sealed class SawtoothTimeSeriesGeneratorBuilder<T>
@@ -602,6 +759,110 @@ public sealed class SawtoothTimeSeriesGeneratorBuilder<T>
             var position = i % _cycleLength;
             var ramp = (double.CreateChecked(_amplitude) * position) / _cycleLength;
             series[TimeSeriesGeneratorBuilderSupport.AddPeriod(_start, _period, i)] = _baseline + T.CreateChecked(ramp);
+        }
+
+        return series;
+    }
+}
+
+/// <summary>
+/// Configures deterministic impulse Chrono sparse series generation.
+/// </summary>
+public sealed class ImpulseTimeSeriesGeneratorBuilder<T>
+    : ITimeSeriesGenerator<T>
+    where T : struct, INumber<T>
+{
+    private readonly Period _period;
+    private DateTimeOffset _start;
+    private int _count;
+    private T _baseline;
+    private Dictionary<int, T> _spikes = [];
+    private ChronoSeriesShape _shape = ChronoSeriesShape.SortedArray;
+
+    internal ImpulseTimeSeriesGeneratorBuilder(Period period)
+    {
+        _period = period;
+    }
+
+    /// <summary>
+    /// Sets the first generated timestamp.
+    /// </summary>
+    public ImpulseTimeSeriesGeneratorBuilder<T> WithStart(DateTimeOffset start)
+    {
+        _start = start;
+        return this;
+    }
+
+    /// <summary>
+    /// Sets the number of generated timestamps.
+    /// </summary>
+    public ImpulseTimeSeriesGeneratorBuilder<T> WithCount(int count)
+    {
+        if (count < 0)
+            throw new ArgumentOutOfRangeException(nameof(count), "Count must not be negative.");
+
+        _count = count;
+        return this;
+    }
+
+    /// <summary>
+    /// Sets the value emitted when no spike exists at a generated point index.
+    /// </summary>
+    public ImpulseTimeSeriesGeneratorBuilder<T> WithBaseline(T baseline)
+    {
+        _baseline = baseline;
+        return this;
+    }
+
+    /// <summary>
+    /// Sets spike values at generated point indexes.
+    /// </summary>
+    public ImpulseTimeSeriesGeneratorBuilder<T> WithSpikes(params (int Index, T Value)[] spikes)
+    {
+        if (spikes.Any(spike => spike.Index < 0))
+            throw new ArgumentOutOfRangeException(nameof(spikes), "Spike indexes must not be negative.");
+
+        _spikes = spikes.ToDictionary(spike => spike.Index, spike => spike.Value);
+        return this;
+    }
+
+    /// <summary>
+    /// Materializes a <see cref="SortedArrayTimeSeries{T}"/>.
+    /// </summary>
+    public ImpulseTimeSeriesGeneratorBuilder<T> AsSortedArray()
+    {
+        _shape = ChronoSeriesShape.SortedArray;
+        return this;
+    }
+
+    /// <summary>
+    /// Materializes a <see cref="FixedSlotTimeSeries{T}"/>.
+    /// </summary>
+    public ImpulseTimeSeriesGeneratorBuilder<T> AsFixedSlot()
+    {
+        _shape = ChronoSeriesShape.FixedSlot;
+        return this;
+    }
+
+    /// <summary>
+    /// Materializes a <see cref="DynamicSlotTimeSeries{T}"/>.
+    /// </summary>
+    public ImpulseTimeSeriesGeneratorBuilder<T> AsDynamicSlot()
+    {
+        _shape = ChronoSeriesShape.DynamicSlot;
+        return this;
+    }
+
+    /// <summary>
+    /// Materializes the configured Chrono sparse series.
+    /// </summary>
+    public ISparseTimeSeries<T> Build()
+    {
+        var series = TimeSeriesGeneratorBuilderSupport.CreateSparseSeries<T>(_shape, _period, _count);
+        for (var i = 0; i < _count; i++)
+        {
+            series[TimeSeriesGeneratorBuilderSupport.AddPeriod(_start, _period, i)] =
+                _spikes.GetValueOrDefault(i, _baseline);
         }
 
         return series;

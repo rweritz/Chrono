@@ -54,6 +54,7 @@ var gapped = ChronoTimeSeriesGenerator
 ## Compose waveforms
 
 Use the `TimeSeriesGenerator` facade when composing reusable generators. This example adds a sawtooth waveform to a baseline trend, then applies deterministic sparse gaps.
+The facade starts constant, random walk, linear trend, step function, seasonal, sawtooth, and impulse generators, each with storage shape selectors.
 
 ```csharp
 var baseline = TimeSeriesGenerator
