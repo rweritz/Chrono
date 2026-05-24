@@ -4,7 +4,7 @@ namespace Chrono.TimeSeries;
 
 public static class TimeSeriesAggregation
 {
-    public static SortedArrayTimeSeries<TOut> Aggregate<TIn, TOut, TAggregator>(
+    public static IReadOnlySparseTimeSeries<TOut> Aggregate<TIn, TOut, TAggregator>(
         IReadOnlySparseTimeSeries<TIn> source,
         Period targetPeriod,
         TAggregator aggregator = default)
@@ -19,88 +19,62 @@ public static class TimeSeriesAggregation
         return SortedArrayTimeSeries<TOut>.CreateFromSortedRaw(buckets.Keys.AsSpan(), buckets.Values.AsSpan(), targetPeriod);
     }
 
-    public static SortedArrayTimeSeries<T> Sum<T>(IReadOnlySparseTimeSeries<T> source, Period targetPeriod)
+    public static IReadOnlySparseTimeSeries<T> Sum<T>(IReadOnlySparseTimeSeries<T> source, Period targetPeriod)
         where T : struct, INumber<T>
         => Aggregate<T, T, SumAggregator<T>>(source, targetPeriod);
 
-    public static SortedArrayTimeSeries<T> Average<T>(IReadOnlySparseTimeSeries<T> source, Period targetPeriod)
+    public static IReadOnlySparseTimeSeries<T> Average<T>(IReadOnlySparseTimeSeries<T> source, Period targetPeriod)
         where T : struct, INumber<T>
         => Aggregate<T, T, AverageAggregator<T>>(source, targetPeriod);
 
-    public static SortedArrayTimeSeries<T> Min<T>(IReadOnlySparseTimeSeries<T> source, Period targetPeriod)
+    public static IReadOnlySparseTimeSeries<T> Min<T>(IReadOnlySparseTimeSeries<T> source, Period targetPeriod)
         where T : struct, INumber<T>, IMinMaxValue<T>
         => Aggregate<T, T, MinAggregator<T>>(source, targetPeriod);
 
-    public static SortedArrayTimeSeries<T> Max<T>(IReadOnlySparseTimeSeries<T> source, Period targetPeriod)
+    public static IReadOnlySparseTimeSeries<T> Max<T>(IReadOnlySparseTimeSeries<T> source, Period targetPeriod)
         where T : struct, INumber<T>, IMinMaxValue<T>
         => Aggregate<T, T, MaxAggregator<T>>(source, targetPeriod);
 
-    public static SortedArrayTimeSeries<int> Count<T>(IReadOnlySparseTimeSeries<T> source, Period targetPeriod)
+    public static IReadOnlySparseTimeSeries<int> Count<T>(IReadOnlySparseTimeSeries<T> source, Period targetPeriod)
         where T : struct, INumber<T>
         => Aggregate<T, int, CountAggregator<T>>(source, targetPeriod);
 
-    public static StepwiseTimeSeries<TOut> Aggregate<TIn, TOut, TAggregator>(
+    public static IReadOnlySparseTimeSeries<T> Resample<T>(IReadOnlySparseTimeSeries<T> source, Period targetPeriod)
+        where T : struct, INumber<T>
+        => Aggregate<T, T, IdentityAggregator<T>>(source, targetPeriod);
+
+    public static IBoundedStepwiseTimeSeries<TOut> Aggregate<TIn, TOut, TAggregator>(
         IBoundedStepwiseTimeSeries<TIn> source,
         Period targetPeriod,
         TAggregator aggregator = default)
         where TIn : struct, INumber<TIn>
         where TOut : struct, INumber<TOut>
         where TAggregator : struct, IAggregator<TIn, TOut>
-    {
-        if (targetPeriod == Period.NonStandard)
-            throw new NotSupportedException($"Period {targetPeriod} is not supported.");
+        => AggregateStepwise<TIn, TOut, TAggregator>(source, targetPeriod, aggregator);
 
-        var startSlot = CalendarSlotMath.ToSlot(source.LogicalRangeStart, source.Period);
-        var endSlot = CalendarSlotMath.ToSlot(source.LogicalRangeEnd, source.Period);
-        var buckets = new List<(long BucketSlot, TOut Value)>();
-
-        long? currentBucketSlot = null;
-        var count = 0;
-
-        for (var slot = startSlot; slot <= endSlot; slot++)
-        {
-            var timestamp = CalendarSlotMath.FromSlot(slot, source.Period);
-            var bucketSlot = CalendarSlotMath.ToSlot(CalendarSlotMath.AlignToSlot(timestamp, targetPeriod), targetPeriod);
-
-            if (currentBucketSlot != bucketSlot)
-            {
-                if (currentBucketSlot.HasValue)
-                    buckets.Add((currentBucketSlot.Value, aggregator.Complete(count)));
-
-                aggregator.Reset();
-                currentBucketSlot = bucketSlot;
-                count = 0;
-            }
-
-            aggregator.Add(source[timestamp]);
-            count++;
-        }
-
-        if (currentBucketSlot.HasValue)
-            buckets.Add((currentBucketSlot.Value, aggregator.Complete(count)));
-
-        return CreateStepwiseResult(targetPeriod, buckets);
-    }
-
-    public static StepwiseTimeSeries<T> Sum<T>(IBoundedStepwiseTimeSeries<T> source, Period targetPeriod)
+    public static IBoundedStepwiseTimeSeries<T> Sum<T>(IBoundedStepwiseTimeSeries<T> source, Period targetPeriod)
         where T : struct, INumber<T>
         => Aggregate<T, T, SumAggregator<T>>(source, targetPeriod);
 
-    public static StepwiseTimeSeries<T> Average<T>(IBoundedStepwiseTimeSeries<T> source, Period targetPeriod)
+    public static IBoundedStepwiseTimeSeries<T> Average<T>(IBoundedStepwiseTimeSeries<T> source, Period targetPeriod)
         where T : struct, INumber<T>
         => Aggregate<T, T, AverageAggregator<T>>(source, targetPeriod);
 
-    public static StepwiseTimeSeries<T> Min<T>(IBoundedStepwiseTimeSeries<T> source, Period targetPeriod)
+    public static IBoundedStepwiseTimeSeries<T> Min<T>(IBoundedStepwiseTimeSeries<T> source, Period targetPeriod)
         where T : struct, INumber<T>, IMinMaxValue<T>
         => Aggregate<T, T, MinAggregator<T>>(source, targetPeriod);
 
-    public static StepwiseTimeSeries<T> Max<T>(IBoundedStepwiseTimeSeries<T> source, Period targetPeriod)
+    public static IBoundedStepwiseTimeSeries<T> Max<T>(IBoundedStepwiseTimeSeries<T> source, Period targetPeriod)
         where T : struct, INumber<T>, IMinMaxValue<T>
         => Aggregate<T, T, MaxAggregator<T>>(source, targetPeriod);
 
-    public static StepwiseTimeSeries<int> Count<T>(IBoundedStepwiseTimeSeries<T> source, Period targetPeriod)
+    public static IBoundedStepwiseTimeSeries<int> Count<T>(IBoundedStepwiseTimeSeries<T> source, Period targetPeriod)
         where T : struct, INumber<T>
         => Aggregate<T, int, CountAggregator<T>>(source, targetPeriod);
+
+    public static IBoundedStepwiseTimeSeries<T> Resample<T>(IBoundedStepwiseTimeSeries<T> source, Period targetPeriod)
+        where T : struct, INumber<T>
+        => Aggregate<T, T, IdentityAggregator<T>>(source, targetPeriod);
 
     public static FixedSlotTimeSeries<TOut> Aggregate<TIn, TOut, TAggregator>(
         FixedSlotTimeSeries<TIn> source,
@@ -143,6 +117,10 @@ public static class TimeSeriesAggregation
     public static FixedSlotTimeSeries<int> Count<T>(FixedSlotTimeSeries<T> source, Period targetPeriod)
         where T : struct, INumber<T>
         => Aggregate<T, int, CountAggregator<T>>(source, targetPeriod);
+
+    public static FixedSlotTimeSeries<T> Resample<T>(FixedSlotTimeSeries<T> source, Period targetPeriod)
+        where T : struct, INumber<T>
+        => Aggregate<T, T, IdentityAggregator<T>>(source, targetPeriod);
 
     public static SortedArrayTimeSeries<TOut> Aggregate<TIn, TOut, TAggregator>(
         SortedArrayTimeSeries<TIn> source,
@@ -223,6 +201,10 @@ public static class TimeSeriesAggregation
         where T : struct, INumber<T>
         => Aggregate<T, int, CountAggregator<T>>(source, targetPeriod);
 
+    public static SortedArrayTimeSeries<T> Resample<T>(SortedArrayTimeSeries<T> source, Period targetPeriod)
+        where T : struct, INumber<T>
+        => Aggregate<T, T, IdentityAggregator<T>>(source, targetPeriod);
+
     public static DynamicSlotTimeSeries<TOut> Aggregate<TIn, TOut, TAggregator>(
         DynamicSlotTimeSeries<TIn> source,
         Period targetPeriod,
@@ -268,6 +250,43 @@ public static class TimeSeriesAggregation
         where T : struct, INumber<T>
         => Aggregate<T, int, CountAggregator<T>>(source, targetPeriod);
 
+    public static DynamicSlotTimeSeries<T> Resample<T>(DynamicSlotTimeSeries<T> source, Period targetPeriod)
+        where T : struct, INumber<T>
+        => Aggregate<T, T, IdentityAggregator<T>>(source, targetPeriod);
+
+    public static StepwiseTimeSeries<TOut> Aggregate<TIn, TOut, TAggregator>(
+        StepwiseTimeSeries<TIn> source,
+        Period targetPeriod,
+        TAggregator aggregator = default)
+        where TIn : struct, INumber<TIn>
+        where TOut : struct, INumber<TOut>
+        where TAggregator : struct, IAggregator<TIn, TOut>
+        => AggregateStepwise<TIn, TOut, TAggregator>(source, targetPeriod, aggregator);
+
+    public static StepwiseTimeSeries<T> Sum<T>(StepwiseTimeSeries<T> source, Period targetPeriod)
+        where T : struct, INumber<T>
+        => Aggregate<T, T, SumAggregator<T>>(source, targetPeriod);
+
+    public static StepwiseTimeSeries<T> Average<T>(StepwiseTimeSeries<T> source, Period targetPeriod)
+        where T : struct, INumber<T>
+        => Aggregate<T, T, AverageAggregator<T>>(source, targetPeriod);
+
+    public static StepwiseTimeSeries<T> Min<T>(StepwiseTimeSeries<T> source, Period targetPeriod)
+        where T : struct, INumber<T>, IMinMaxValue<T>
+        => Aggregate<T, T, MinAggregator<T>>(source, targetPeriod);
+
+    public static StepwiseTimeSeries<T> Max<T>(StepwiseTimeSeries<T> source, Period targetPeriod)
+        where T : struct, INumber<T>, IMinMaxValue<T>
+        => Aggregate<T, T, MaxAggregator<T>>(source, targetPeriod);
+
+    public static StepwiseTimeSeries<int> Count<T>(StepwiseTimeSeries<T> source, Period targetPeriod)
+        where T : struct, INumber<T>
+        => Aggregate<T, int, CountAggregator<T>>(source, targetPeriod);
+
+    public static StepwiseTimeSeries<T> Resample<T>(StepwiseTimeSeries<T> source, Period targetPeriod)
+        where T : struct, INumber<T>
+        => Aggregate<T, T, IdentityAggregator<T>>(source, targetPeriod);
+
     private static (long[] Keys, TOut[] Values) AggregateSparsePoints<TIn, TOut, TAggregator>(
         IEnumerable<TimeSeriesPoint<TIn>> points,
         Period targetPeriod,
@@ -310,6 +329,49 @@ public static class TimeSeriesAggregation
         keys.Add(currentBucket.UtcTicks);
         values.Add(aggregator.Complete(bucketCount));
         return ([.. keys], [.. values]);
+    }
+
+    private static StepwiseTimeSeries<TOut> AggregateStepwise<TIn, TOut, TAggregator>(
+        IBoundedStepwiseTimeSeries<TIn> source,
+        Period targetPeriod,
+        TAggregator aggregator)
+        where TIn : struct, INumber<TIn>
+        where TOut : struct, INumber<TOut>
+        where TAggregator : struct, IAggregator<TIn, TOut>
+    {
+        if (targetPeriod == Period.NonStandard)
+            throw new NotSupportedException($"Period {targetPeriod} is not supported.");
+
+        var startSlot = CalendarSlotMath.ToSlot(source.LogicalRangeStart, source.Period);
+        var endSlot = CalendarSlotMath.ToSlot(source.LogicalRangeEnd, source.Period);
+        var buckets = new List<(long BucketSlot, TOut Value)>();
+
+        long? currentBucketSlot = null;
+        var count = 0;
+
+        for (var slot = startSlot; slot <= endSlot; slot++)
+        {
+            var timestamp = CalendarSlotMath.FromSlot(slot, source.Period);
+            var bucketSlot = CalendarSlotMath.ToSlot(CalendarSlotMath.AlignToSlot(timestamp, targetPeriod), targetPeriod);
+
+            if (currentBucketSlot != bucketSlot)
+            {
+                if (currentBucketSlot.HasValue)
+                    buckets.Add((currentBucketSlot.Value, aggregator.Complete(count)));
+
+                aggregator.Reset();
+                currentBucketSlot = bucketSlot;
+                count = 0;
+            }
+
+            aggregator.Add(source[timestamp]);
+            count++;
+        }
+
+        if (currentBucketSlot.HasValue)
+            buckets.Add((currentBucketSlot.Value, aggregator.Complete(count)));
+
+        return CreateStepwiseResult(targetPeriod, buckets);
     }
 
     private static DateTimeOffset FirstBucket(DateTimeOffset timestamp, Period targetPeriod)
