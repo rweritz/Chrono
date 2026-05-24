@@ -2,6 +2,8 @@
 
 All benchmarks use [BenchmarkDotNet](https://github.com/dotnet/BenchmarkDotNet) with the default job configuration on .NET 10. Every benchmark operates on N = 10,000 data points using `double` values. `FixedSlotTimeSeries` and `SortedArrayTimeSeries` benchmarks use 5-minute intervals; `DynamicSlotTimeSeries` benchmarks use hourly or monthly intervals depending on the scenario.
 
+`StepwiseTimeSeries<T>` was added in v0.3.0, but the current benchmark suites still focus on the three sparse storage strategies. This page documents the benchmark coverage that exists today.
+
 ## Environment
 
 ```
@@ -142,4 +144,4 @@ From the repository root:
 dotnet run --project benchmarks/Chrono.TimeSeries.Benchmark/Chrono.TimeSeries.Benchmark.csproj -c Release
 ```
 
-Results are written to `BenchmarkDotNet.Artifacts/` in the repository root. Three benchmark classes run automatically: `TimeSeriesPerformance`, `TimeSeriesMathBenchmarks`, and `TimeSeriesAggregationBenchmarks`. Each class includes benchmarks for all three time series types: `FixedSlotTimeSeries`, `SortedArrayTimeSeries`, and `DynamicSlotTimeSeries`.
+Results are written to `BenchmarkDotNet.Artifacts/` in the repository root. Three benchmark classes run automatically: `TimeSeriesPerformance`, `TimeSeriesMathBenchmarks`, and `TimeSeriesAggregationBenchmarks`. Today they cover the three sparse time series types: `FixedSlotTimeSeries`, `SortedArrayTimeSeries`, and `DynamicSlotTimeSeries`.
