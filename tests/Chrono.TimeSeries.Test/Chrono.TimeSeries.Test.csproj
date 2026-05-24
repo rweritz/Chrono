@@ -21,6 +21,7 @@
 
     <ItemGroup>
       <ProjectReference Include="..\..\src\Chrono.TimeSeries\Chrono.TimeSeries.csproj" />
+      <ProjectReference Include="..\..\src\Chrono.Testing\Chrono.Testing.csproj" />
     </ItemGroup>
 
 </Project>

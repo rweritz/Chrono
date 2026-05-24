@@ -143,6 +143,34 @@ public static class TimeSeriesAssert
     }
 
     /// <summary>
+    /// Asserts that every adjacent explicit sparse time-series point is separated by exactly one period.
+    /// </summary>
+    public static void HasNoGaps<T>(IReadOnlySparseTimeSeries<T> series)
+        where T : struct, INumber<T>
+    {
+        ArgumentNullException.ThrowIfNull(series);
+
+        using var points = series.GetPoints().GetEnumerator();
+        if (!points.MoveNext())
+            return;
+
+        var previous = points.Current.Timestamp;
+        while (points.MoveNext())
+        {
+            var expectedNext = AddPeriod(previous, series.Period);
+            var actualNext = points.Current.Timestamp;
+
+            if (actualNext != expectedNext)
+            {
+                Fail(
+                    $"Time series gap detected. Expected next timestamp {FormatTimestamp(expectedNext)} after {FormatTimestamp(previous)}. Actual {FormatTimestamp(actualNext)}.");
+            }
+
+            previous = actualNext;
+        }
+    }
+
+    /// <summary>
     /// Asserts that a time series has a value at the timestamp within the supplied tolerance.
     /// </summary>
     public static void ValueAtCloseTo<T>(
@@ -173,6 +201,23 @@ public static class TimeSeriesAssert
     private static string FormatValue<T>(T value)
         where T : struct, INumber<T> =>
         value.ToString(null, CultureInfo.InvariantCulture);
+
+    private static DateTimeOffset AddPeriod(DateTimeOffset timestamp, Period period) =>
+        period switch
+        {
+            Period.FiveMinutes => timestamp.AddMinutes(5),
+            Period.QuaterHour => timestamp.AddMinutes(15),
+            Period.HalfHour => timestamp.AddMinutes(30),
+            Period.Hour => timestamp.AddHours(1),
+            Period.HalfDay => timestamp.AddHours(12),
+            Period.Day => timestamp.AddDays(1),
+            Period.Week => timestamp.AddDays(7),
+            Period.Month => timestamp.AddMonths(1),
+            Period.QuaterYear => timestamp.AddMonths(3),
+            Period.HalfYear => timestamp.AddMonths(6),
+            Period.Year => timestamp.AddYears(1),
+            _ => throw new NotSupportedException($"Period {period} does not support gap checks.")
+        };
 
     private static void Fail(string message) => throw new TimeSeriesAssertionException(message);
 }
