@@ -4,6 +4,70 @@ namespace Chrono.TimeSeries;
 
 public static class TimeSeriesAggregation
 {
+    public static bool TryAggregateAsFixedSlotTimeSeries<TIn, TOut, TAggregator>(
+        IReadOnlyTimeSeries<TIn> source,
+        Period targetPeriod,
+        out FixedSlotTimeSeries<TOut>? result,
+        TAggregator aggregator = default)
+        where TIn : struct, INumber<TIn>
+        where TOut : struct, INumber<TOut>
+        where TAggregator : struct, IAggregator<TIn, TOut>
+        => TryAggregateAsSparseTarget<TIn, TOut, TAggregator, FixedSlotTimeSeries<TOut>>(source, targetPeriod,
+            TimeSeriesMath.TimeSeriesSpecializationTarget.FixedSlot,
+            static sparse => TimeSeriesMath.ToFixedSlotTimeSeries(sparse), out result, aggregator);
+
+    public static bool TryAggregateAsDynamicSlotTimeSeries<TIn, TOut, TAggregator>(
+        IReadOnlyTimeSeries<TIn> source,
+        Period targetPeriod,
+        out DynamicSlotTimeSeries<TOut>? result,
+        TAggregator aggregator = default)
+        where TIn : struct, INumber<TIn>
+        where TOut : struct, INumber<TOut>
+        where TAggregator : struct, IAggregator<TIn, TOut>
+        => TryAggregateAsSparseTarget<TIn, TOut, TAggregator, DynamicSlotTimeSeries<TOut>>(source, targetPeriod,
+            TimeSeriesMath.TimeSeriesSpecializationTarget.DynamicSlot,
+            static sparse => TimeSeriesMath.ToDynamicSlotTimeSeries(sparse), out result, aggregator);
+
+    public static bool TryAggregateAsBoundedStepwiseTimeSeries<TIn, TOut, TAggregator>(
+        IReadOnlyTimeSeries<TIn> source,
+        Period targetPeriod,
+        out StepwiseTimeSeries<TOut>? result,
+        TAggregator aggregator = default)
+        where TIn : struct, INumber<TIn>
+        where TOut : struct, INumber<TOut>
+        where TAggregator : struct, IAggregator<TIn, TOut>
+    {
+        if (!TimeSeriesMath.TryValidateSpecialization(source, targetPeriod, TimeSeriesMath.TimeSeriesSpecializationTarget.BoundedStepwise))
+        {
+            result = null;
+            return false;
+        }
+
+        result = (StepwiseTimeSeries<TOut>)Aggregate<TIn, TOut, TAggregator>((IBoundedStepwiseTimeSeries<TIn>)source, targetPeriod, aggregator);
+        return true;
+    }
+
+    public static bool TryResampleAsFixedSlotTimeSeries<T>(
+        IReadOnlyTimeSeries<T> source,
+        Period targetPeriod,
+        out FixedSlotTimeSeries<T>? result)
+        where T : struct, INumber<T>
+        => TryAggregateAsFixedSlotTimeSeries<T, T, IdentityAggregator<T>>(source, targetPeriod, out result);
+
+    public static bool TryResampleAsDynamicSlotTimeSeries<T>(
+        IReadOnlyTimeSeries<T> source,
+        Period targetPeriod,
+        out DynamicSlotTimeSeries<T>? result)
+        where T : struct, INumber<T>
+        => TryAggregateAsDynamicSlotTimeSeries<T, T, IdentityAggregator<T>>(source, targetPeriod, out result);
+
+    public static bool TryResampleAsBoundedStepwiseTimeSeries<T>(
+        IReadOnlyTimeSeries<T> source,
+        Period targetPeriod,
+        out StepwiseTimeSeries<T>? result)
+        where T : struct, INumber<T>
+        => TryAggregateAsBoundedStepwiseTimeSeries<T, T, IdentityAggregator<T>>(source, targetPeriod, out result);
+
     public static IReadOnlySparseTimeSeries<TOut> Aggregate<TIn, TOut, TAggregator>(
         IReadOnlySparseTimeSeries<TIn> source,
         Period targetPeriod,
@@ -286,6 +350,28 @@ public static class TimeSeriesAggregation
     public static StepwiseTimeSeries<T> Resample<T>(StepwiseTimeSeries<T> source, Period targetPeriod)
         where T : struct, INumber<T>
         => Aggregate<T, T, IdentityAggregator<T>>(source, targetPeriod);
+
+    private static bool TryAggregateAsSparseTarget<TIn, TOut, TAggregator, TResult>(
+        IReadOnlyTimeSeries<TIn> source,
+        Period targetPeriod,
+        TimeSeriesMath.TimeSeriesSpecializationTarget target,
+        Func<IReadOnlySparseTimeSeries<TOut>, TResult> converter,
+        out TResult? result,
+        TAggregator aggregator = default)
+        where TIn : struct, INumber<TIn>
+        where TOut : struct, INumber<TOut>
+        where TAggregator : struct, IAggregator<TIn, TOut>
+        where TResult : class, IReadOnlyTimeSeries<TOut>
+    {
+        if (!TimeSeriesMath.TryValidateSpecialization(source, targetPeriod, target))
+        {
+            result = null;
+            return false;
+        }
+
+        result = converter(Aggregate<TIn, TOut, TAggregator>((IReadOnlySparseTimeSeries<TIn>)source, targetPeriod, aggregator));
+        return true;
+    }
 
     private static (long[] Keys, TOut[] Values) AggregateSparsePoints<TIn, TOut, TAggregator>(
         IEnumerable<TimeSeriesPoint<TIn>> points,

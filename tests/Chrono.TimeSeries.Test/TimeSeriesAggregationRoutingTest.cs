@@ -6,6 +6,141 @@ namespace Chrono.TimeSeries.Test;
 public class TimeSeriesAggregationRoutingTest
 {
     [Fact]
+    public void AggregationSpecializationApis_ShouldExposeMajorTargetFamilies()
+    {
+        var methods = typeof(TimeSeriesAggregation)
+            .GetMethods(BindingFlags.Public | BindingFlags.Static)
+            .Where(method => method.Name.StartsWith("Try", StringComparison.Ordinal))
+            .ToList();
+
+        methods.Should().Contain(method => HasAggregateSpecializationSignature(method, "TryAggregateAsFixedSlotTimeSeries",
+            typeof(FixedSlotTimeSeries<>)));
+        methods.Should().Contain(method => HasAggregateSpecializationSignature(method, "TryAggregateAsDynamicSlotTimeSeries",
+            typeof(DynamicSlotTimeSeries<>)));
+        methods.Should().Contain(method => HasAggregateSpecializationSignature(method, "TryAggregateAsBoundedStepwiseTimeSeries",
+            typeof(StepwiseTimeSeries<>)));
+        methods.Should().Contain(method => HasResampleSpecializationSignature(method, "TryResampleAsFixedSlotTimeSeries",
+            typeof(FixedSlotTimeSeries<>)));
+        methods.Should().Contain(method => HasResampleSpecializationSignature(method, "TryResampleAsDynamicSlotTimeSeries",
+            typeof(DynamicSlotTimeSeries<>)));
+        methods.Should().Contain(method => HasResampleSpecializationSignature(method, "TryResampleAsBoundedStepwiseTimeSeries",
+            typeof(StepwiseTimeSeries<>)));
+    }
+
+    [Fact]
+    public void TryAggregateAsDynamicSlotTimeSeries_ShouldSucceedForSemanticallySparseAggregation()
+    {
+        var start = new DateTimeOffset(2024, 1, 1, 0, 0, 0, TimeSpan.Zero);
+        IReadOnlyTimeSeries<int> source = new SortedArrayTimeSeries<int>(Period.FiveMinutes);
+
+        ((ITimeSeries<int>)source)[start] = 2;
+        ((ITimeSeries<int>)source)[start.AddMinutes(5)] = 4;
+
+        var success = TimeSeriesAggregation.TryAggregateAsDynamicSlotTimeSeries<int, int, SumAggregator<int>>(
+            source,
+            Period.Hour,
+            out var result);
+
+        success.Should().BeTrue();
+        result.Should().NotBeNull();
+        result.Should().BeOfType<DynamicSlotTimeSeries<int>>();
+        result!.GetPoints().Should().Equal(new TimeSeriesPoint<int>(start, 6));
+    }
+
+    [Fact]
+    public void TryAggregateAsFixedSlotTimeSeries_ShouldSucceedForFixedPeriodSparseAggregation()
+    {
+        var start = new DateTimeOffset(2024, 1, 1, 0, 0, 0, TimeSpan.Zero);
+        IReadOnlyTimeSeries<int> source = new SortedArrayTimeSeries<int>(Period.FiveMinutes);
+
+        ((ITimeSeries<int>)source)[start] = 2;
+        ((ITimeSeries<int>)source)[start.AddMinutes(5)] = 4;
+
+        var success = TimeSeriesAggregation.TryAggregateAsFixedSlotTimeSeries<int, int, SumAggregator<int>>(
+            source,
+            Period.Hour,
+            out var result);
+
+        success.Should().BeTrue();
+        result.Should().NotBeNull();
+        result.Should().BeOfType<FixedSlotTimeSeries<int>>();
+        result!.GetPoints().Should().Equal(new TimeSeriesPoint<int>(start, 6));
+    }
+
+    [Fact]
+    public void TryAggregateAsBoundedStepwiseTimeSeries_ShouldFailForSparseAggregationSemantics()
+    {
+        var start = new DateTimeOffset(2024, 1, 1, 0, 0, 0, TimeSpan.Zero);
+        IReadOnlyTimeSeries<int> source = new SortedArrayTimeSeries<int>(Period.FiveMinutes);
+
+        ((ITimeSeries<int>)source)[start] = 2;
+        ((ITimeSeries<int>)source)[start.AddMinutes(5)] = 4;
+
+        var success = TimeSeriesAggregation.TryAggregateAsBoundedStepwiseTimeSeries<int, int, SumAggregator<int>>(
+            source,
+            Period.Hour,
+            out var result);
+
+        success.Should().BeFalse();
+        result.Should().BeNull();
+    }
+
+    [Fact]
+    public void TryResampleAsDynamicSlotTimeSeries_ShouldSucceedForSemanticallySparseExplicitResampling()
+    {
+        var start = new DateTimeOffset(2024, 1, 1, 0, 0, 0, TimeSpan.Zero);
+        IReadOnlyTimeSeries<int> source = new SortedArrayTimeSeries<int>(Period.FiveMinutes);
+
+        ((ITimeSeries<int>)source)[start] = 2;
+        ((ITimeSeries<int>)source)[start.AddMinutes(5)] = 4;
+
+        var success = TimeSeriesAggregation.TryResampleAsDynamicSlotTimeSeries(source, Period.FiveMinutes, out var result);
+
+        success.Should().BeTrue();
+        result.Should().NotBeNull();
+        result.Should().BeOfType<DynamicSlotTimeSeries<int>>();
+        result!.GetPoints().Should().Equal(
+            new TimeSeriesPoint<int>(start, 2),
+            new TimeSeriesPoint<int>(start.AddMinutes(5), 4));
+    }
+
+    [Fact]
+    public void TryResampleAsBoundedStepwiseTimeSeries_ShouldSucceedForSemanticallyBoundedStepwiseExplicitResampling()
+    {
+        var start = new DateTimeOffset(2024, 1, 1, 0, 0, 0, TimeSpan.Zero);
+        IReadOnlyTimeSeries<int> source = new StepwiseTimeSeries<int>(Period.FiveMinutes, start, start.AddMinutes(10), 2);
+
+        ((ITimeSeries<int>)source)[start.AddMinutes(5)] = 4;
+
+        var success = TimeSeriesAggregation.TryResampleAsBoundedStepwiseTimeSeries(source, Period.FiveMinutes, out var result);
+
+        success.Should().BeTrue();
+        result.Should().NotBeNull();
+        result.Should().BeOfType<StepwiseTimeSeries<int>>();
+        result!.LogicalRangeStart.Should().Be(start);
+        result.LogicalRangeEnd.Should().Be(start.AddMinutes(10));
+        result.GetChangePoints().Should().Equal(
+            new TimeSeriesPoint<int>(start, 2),
+            new TimeSeriesPoint<int>(start.AddMinutes(5), 4),
+            new TimeSeriesPoint<int>(start.AddMinutes(10), 2));
+    }
+
+    [Fact]
+    public void TryResampleAsFixedSlotTimeSeries_ShouldFailWhenTheTargetPeriodCannotUseFixedSlots()
+    {
+        var january = new DateTimeOffset(2024, 1, 1, 0, 0, 0, TimeSpan.Zero);
+        IReadOnlyTimeSeries<int> source = new SortedArrayTimeSeries<int>(Period.Month);
+
+        ((ITimeSeries<int>)source)[january] = 2;
+        ((ITimeSeries<int>)source)[january.AddMonths(1)] = 4;
+
+        var success = TimeSeriesAggregation.TryResampleAsFixedSlotTimeSeries(source, Period.Month, out var result);
+
+        success.Should().BeFalse();
+        result.Should().BeNull();
+    }
+
+    [Fact]
     public void Aggregate_ExactConcreteTypes_ShouldPreserveConcreteFamilies()
     {
         var start = new DateTimeOffset(2024, 1, 1, 0, 0, 0, TimeSpan.Zero);
@@ -220,4 +355,51 @@ public class TimeSeriesAggregationRoutingTest
                 method.GetParameters() is [{ ParameterType: var parameterType }, ..] &&
                 parameterType.IsGenericType &&
                 parameterType.GetGenericTypeDefinition() == firstParameterTypeDefinition);
+
+    private static bool HasAggregateSpecializationSignature(MethodInfo method, string methodName, Type outTypeDefinition)
+    {
+        if (method.Name != methodName || !method.IsGenericMethodDefinition || method.ReturnType != typeof(bool))
+            return false;
+
+        var genericArguments = method.GetGenericArguments();
+        if (genericArguments.Length != 3)
+            return false;
+
+        var inputType = genericArguments[0];
+        var outputType = genericArguments[1];
+        var aggregatorType = genericArguments[2];
+        var parameters = method.GetParameters();
+        if (parameters.Length != 4 ||
+            parameters[0].ParameterType != typeof(IReadOnlyTimeSeries<>).MakeGenericType(inputType) ||
+            parameters[1].ParameterType != typeof(Period) ||
+            !parameters[2].IsOut ||
+            parameters[3].ParameterType != aggregatorType)
+        {
+            return false;
+        }
+
+        return parameters[2].ParameterType.GetElementType() == outTypeDefinition.MakeGenericType(outputType);
+    }
+
+    private static bool HasResampleSpecializationSignature(MethodInfo method, string methodName, Type outTypeDefinition)
+    {
+        if (method.Name != methodName || !method.IsGenericMethodDefinition || method.ReturnType != typeof(bool))
+            return false;
+
+        var genericArguments = method.GetGenericArguments();
+        if (genericArguments.Length != 1)
+            return false;
+
+        var genericType = genericArguments[0];
+        var parameters = method.GetParameters();
+        if (parameters.Length != 3 ||
+            parameters[0].ParameterType != typeof(IReadOnlyTimeSeries<>).MakeGenericType(genericType) ||
+            parameters[1].ParameterType != typeof(Period) ||
+            !parameters[2].IsOut)
+        {
+            return false;
+        }
+
+        return parameters[2].ParameterType.GetElementType() == outTypeDefinition.MakeGenericType(genericType);
+    }
 }
