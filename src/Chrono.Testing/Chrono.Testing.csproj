@@ -1,0 +1,29 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <PackageId>Chrono.Testing</PackageId>
+        <Version>0.1.0</Version>
+        <Authors>rweritz</Authors>
+        <Description>Deterministic Chrono time-series test data generators and assertions for static and FluentAssertions-based tests.</Description>
+        <PackageLicenseExpression>MIT</PackageLicenseExpression>
+        <PackageProjectUrl>https://github.com/rweritz/Chrono</PackageProjectUrl>
+        <RepositoryUrl>https://github.com/rweritz/Chrono</RepositoryUrl>
+        <RepositoryType>git</RepositoryType>
+        <PackageTags>timeseries;time-series;testing;test-data;generators;assertions;fluentassertions;dotnet</PackageTags>
+        <PackageReadmeFile>README.md</PackageReadmeFile>
+        <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <PackageReference Include="FluentAssertions" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <ProjectReference Include="..\Chrono.TimeSeries\Chrono.TimeSeries.csproj" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <None Include="README.md" Pack="true" PackagePath="\" />
+    </ItemGroup>
+
+</Project>

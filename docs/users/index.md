@@ -9,7 +9,8 @@ Welcome to the Chrono time series library documentation. Chrono provides high-pe
 3. [Periods & Alignment](periods-and-alignment.md) — the `Period` enum, timestamp validation, and slot math
 4. [Arithmetic Operations](arithmetic-operations.md) — binary operations between series, scalar math, missing value policies
 5. [Aggregation](aggregation.md) — roll-up to coarser periods with Sum, Average, Min, Max, Count
-6. [Benchmarks](benchmarks.md) — performance characteristics, results, and guidance
+6. [Testing Chrono Code](testing.md) — deterministic test data generators and assertion helpers from `Chrono.Testing`
+7. [Benchmarks](benchmarks.md) — performance characteristics, results, and guidance
 
 ## Overview
 
