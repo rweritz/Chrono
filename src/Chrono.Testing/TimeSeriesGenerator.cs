@@ -37,11 +37,28 @@ public static class TimeSeriesGenerator
         new(period);
 
     /// <summary>
+    /// Starts a generator that emits a repeating sawtooth ramp.
+    /// </summary>
+    public static SawtoothTimeSeriesGeneratorBuilder<T> Sawtooth<T>(Period period)
+        where T : struct, INumber<T> =>
+        new(period);
+
+    /// <summary>
     /// Starts a generator that removes explicit points from another sparse generator.
     /// </summary>
     public static SparseTimeSeriesGeneratorBuilder<T> Sparse<T>(ITimeSeriesGenerator<T> source)
         where T : struct, INumber<T> =>
         new(source);
+
+    /// <summary>
+    /// Starts a generator that combines aligned points from two source generators.
+    /// </summary>
+    public static CompositeTimeSeriesGeneratorBuilder<T> Composite<T>(
+        ITimeSeriesGenerator<T> left,
+        ITimeSeriesGenerator<T> right,
+        Func<T, T, T> combine)
+        where T : struct, INumber<T> =>
+        new(left, right, combine);
 }
 
 /// <summary>
@@ -477,6 +494,121 @@ public sealed class StepFunctionTimeSeriesGeneratorBuilder<T>
 }
 
 /// <summary>
+/// Configures deterministic sawtooth Chrono sparse series generation.
+/// </summary>
+public sealed class SawtoothTimeSeriesGeneratorBuilder<T>
+    : ITimeSeriesGenerator<T>
+    where T : struct, INumber<T>
+{
+    private readonly Period _period;
+    private DateTimeOffset _start;
+    private int _count;
+    private T _amplitude = T.One;
+    private int _cycleLength = 1;
+    private T _baseline;
+    private ChronoSeriesShape _shape = ChronoSeriesShape.SortedArray;
+
+    internal SawtoothTimeSeriesGeneratorBuilder(Period period)
+    {
+        _period = period;
+    }
+
+    /// <summary>
+    /// Sets the first generated timestamp.
+    /// </summary>
+    public SawtoothTimeSeriesGeneratorBuilder<T> WithStart(DateTimeOffset start)
+    {
+        _start = start;
+        return this;
+    }
+
+    /// <summary>
+    /// Sets the number of generated timestamps.
+    /// </summary>
+    public SawtoothTimeSeriesGeneratorBuilder<T> WithCount(int count)
+    {
+        if (count < 0)
+            throw new ArgumentOutOfRangeException(nameof(count), "Count must not be negative.");
+
+        _count = count;
+        return this;
+    }
+
+    /// <summary>
+    /// Sets the ramp amplitude across each cycle.
+    /// </summary>
+    public SawtoothTimeSeriesGeneratorBuilder<T> WithAmplitude(T amplitude)
+    {
+        _amplitude = amplitude;
+        return this;
+    }
+
+    /// <summary>
+    /// Sets the number of generated timestamps in each cycle.
+    /// </summary>
+    public SawtoothTimeSeriesGeneratorBuilder<T> WithCycleLength(int cycleLength)
+    {
+        if (cycleLength <= 0)
+            throw new ArgumentOutOfRangeException(nameof(cycleLength), "Cycle length must be positive.");
+
+        _cycleLength = cycleLength;
+        return this;
+    }
+
+    /// <summary>
+    /// Sets the value added to every generated ramp point.
+    /// </summary>
+    public SawtoothTimeSeriesGeneratorBuilder<T> WithBaseline(T baseline)
+    {
+        _baseline = baseline;
+        return this;
+    }
+
+    /// <summary>
+    /// Materializes a <see cref="SortedArrayTimeSeries{T}"/>.
+    /// </summary>
+    public SawtoothTimeSeriesGeneratorBuilder<T> AsSortedArray()
+    {
+        _shape = ChronoSeriesShape.SortedArray;
+        return this;
+    }
+
+    /// <summary>
+    /// Materializes a <see cref="FixedSlotTimeSeries{T}"/>.
+    /// </summary>
+    public SawtoothTimeSeriesGeneratorBuilder<T> AsFixedSlot()
+    {
+        _shape = ChronoSeriesShape.FixedSlot;
+        return this;
+    }
+
+    /// <summary>
+    /// Materializes a <see cref="DynamicSlotTimeSeries{T}"/>.
+    /// </summary>
+    public SawtoothTimeSeriesGeneratorBuilder<T> AsDynamicSlot()
+    {
+        _shape = ChronoSeriesShape.DynamicSlot;
+        return this;
+    }
+
+    /// <summary>
+    /// Materializes the configured Chrono sparse series.
+    /// </summary>
+    public ISparseTimeSeries<T> Build()
+    {
+        var series = TimeSeriesGeneratorBuilderSupport.CreateSparseSeries<T>(_shape, _period, _count);
+        for (var i = 0; i < _count; i++)
+        {
+            var position = i % _cycleLength;
+            var ramp = (double.CreateChecked(_amplitude) * position) / _cycleLength;
+            series[TimeSeriesGeneratorBuilderSupport.AddPeriod(_start, _period, i)] = _baseline + T.CreateChecked(ramp);
+        }
+
+        return series;
+    }
+}
+
+/// <summary>
 /// Configures deterministic sparse-with-gaps Chrono series generation.
 /// </summary>
 public sealed class SparseTimeSeriesGeneratorBuilder<T> : ITimeSeriesGenerator<T>
@@ -524,6 +656,50 @@ public sealed class SparseTimeSeriesGeneratorBuilder<T> : ITimeSeriesGenerator<T
         {
             if (random.NextDouble() < _gapProbability)
                 series.Remove(point.Timestamp);
+        }
+
+        return series;
+    }
+}
+
+/// <summary>
+/// Configures deterministic composite Chrono sparse series generation.
+/// </summary>
+public sealed class CompositeTimeSeriesGeneratorBuilder<T> : ITimeSeriesGenerator<T>
+    where T : struct, INumber<T>
+{
+    private readonly ITimeSeriesGenerator<T> _left;
+    private readonly ITimeSeriesGenerator<T> _right;
+    private readonly Func<T, T, T> _combine;
+
+    internal CompositeTimeSeriesGeneratorBuilder(
+        ITimeSeriesGenerator<T> left,
+        ITimeSeriesGenerator<T> right,
+        Func<T, T, T> combine)
+    {
+        _left = left ?? throw new ArgumentNullException(nameof(left));
+        _right = right ?? throw new ArgumentNullException(nameof(right));
+        _combine = combine ?? throw new ArgumentNullException(nameof(combine));
+    }
+
+    /// <summary>
+    /// Materializes the configured composite Chrono sparse series.
+    /// </summary>
+    public ISparseTimeSeries<T> Build()
+    {
+        var left = _left.Build();
+        var right = _right.Build();
+
+        if (left.Period != right.Period)
+            throw new InvalidOperationException("Composite generators must use the same period.");
+
+        var leftPoints = left.GetPoints().ToArray();
+        var series = new SortedArrayTimeSeries<T>(left.Period, leftPoints.Length);
+
+        foreach (var point in leftPoints)
+        {
+            if (right.TryGetValue(point.Timestamp, out var rightValue))
+                series[point.Timestamp] = _combine(point.Value, rightValue);
         }
 
         return series;

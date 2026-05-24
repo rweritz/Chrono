@@ -162,6 +162,116 @@ public sealed class ChronoTimeSeriesGeneratorTest
     }
 
     [Fact]
+    public void SeasonalBuildsPeriodAlignedDeterministicCycle()
+    {
+        var start = new DateTimeOffset(2026, 6, 1, 0, 0, 0, TimeSpan.Zero);
+
+        var first = ChronoTimeSeriesGenerator
+            .For<double>()
+            .WithPeriod(Period.Hour)
+            .WithStart(start)
+            .WithCount(5)
+            .WithSeed(17)
+            .Seasonal(amplitude: 10.0, cycleLength: 4, baseline: 50.0)
+            .Build();
+
+        var second = ChronoTimeSeriesGenerator
+            .For<double>()
+            .WithPeriod(Period.Hour)
+            .WithStart(start)
+            .WithCount(5)
+            .WithSeed(17)
+            .Seasonal(amplitude: 10.0, cycleLength: 4, baseline: 50.0)
+            .Build();
+
+        first.GetPoints().Should().Equal(second.GetPoints());
+        first.GetPoints().Select(point => point.Timestamp).Should().Equal(
+            start,
+            start.AddHours(1),
+            start.AddHours(2),
+            start.AddHours(3),
+            start.AddHours(4));
+        var values = first.GetPoints().Select(point => point.Value).ToArray();
+        values[0].Should().BeApproximately(50.0, 0.000001);
+        values[1].Should().BeApproximately(60.0, 0.000001);
+        values[2].Should().BeApproximately(50.0, 0.000001);
+        values[3].Should().BeApproximately(40.0, 0.000001);
+        values[4].Should().BeApproximately(50.0, 0.000001);
+    }
+
+    [Fact]
+    public void SawtoothFacadeBuildsRepeatingRamp()
+    {
+        var start = new DateTimeOffset(2026, 7, 1, 0, 0, 0, TimeSpan.Zero);
+
+        var series = TimeSeriesGenerator
+            .Sawtooth<int>(Period.Day)
+            .WithStart(start)
+            .WithCount(5)
+            .WithAmplitude(6)
+            .WithCycleLength(3)
+            .Build();
+
+        series.Period.Should().Be(Period.Day);
+        series.GetPoints().Should().Equal(
+            new TimeSeriesPoint<int>(start, 0),
+            new TimeSeriesPoint<int>(start.AddDays(1), 2),
+            new TimeSeriesPoint<int>(start.AddDays(2), 4),
+            new TimeSeriesPoint<int>(start.AddDays(3), 0),
+            new TimeSeriesPoint<int>(start.AddDays(4), 2));
+    }
+
+    [Fact]
+    public void ImpulseBuildsBaselineWithConfiguredSpikes()
+    {
+        var start = new DateTimeOffset(2026, 8, 1, 0, 0, 0, TimeSpan.Zero);
+
+        var series = ChronoTimeSeriesGenerator
+            .For<double>()
+            .WithPeriod(Period.HalfHour)
+            .WithStart(start)
+            .WithCount(5)
+            .Impulse(baseline: 1.5, (2, 9.0), (4, -2.0))
+            .Build();
+
+        series.GetPoints().Should().Equal(
+            new TimeSeriesPoint<double>(start, 1.5),
+            new TimeSeriesPoint<double>(start.AddMinutes(30), 1.5),
+            new TimeSeriesPoint<double>(start.AddMinutes(60), 9.0),
+            new TimeSeriesPoint<double>(start.AddMinutes(90), 1.5),
+            new TimeSeriesPoint<double>(start.AddMinutes(120), -2.0));
+    }
+
+    [Fact]
+    public void CompositeFacadeCombinesAlignedGeneratorOutputs()
+    {
+        var start = new DateTimeOffset(2026, 9, 1, 0, 0, 0, TimeSpan.Zero);
+        var baseline = ChronoTimeSeriesGenerator
+            .For<double>()
+            .WithPeriod(Period.Hour)
+            .WithStart(start)
+            .WithCount(4)
+            .Constant(10.0);
+        var spikes = ChronoTimeSeriesGenerator
+            .For<double>()
+            .WithPeriod(Period.Hour)
+            .WithStart(start)
+            .WithCount(4)
+            .Impulse(0.0, (1, 5.0), (3, -2.0));
+
+        var series = TimeSeriesGenerator
+            .Composite(baseline, spikes, static (left, right) => left + right)
+            .Build();
+
+        series.Period.Should().Be(Period.Hour);
+        series.GetPoints().Should().Equal(
+            new TimeSeriesPoint<double>(start, 10.0),
+            new TimeSeriesPoint<double>(start.AddHours(1), 15.0),
+            new TimeSeriesPoint<double>(start.AddHours(2), 10.0),
+            new TimeSeriesPoint<double>(start.AddHours(3), 8.0));
+    }
+
+    [Fact]
     public void BuildMaterializesDeterministicSortedArraySeries()
     {
         var start = new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero);

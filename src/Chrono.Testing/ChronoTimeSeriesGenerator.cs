@@ -36,6 +36,11 @@ public sealed class ChronoTimeSeriesGeneratorBuilder<T>
     private T _step = T.One;
     private int _stepLength = 1;
     private T[] _stepValues = [T.Zero];
+    private T _baseline;
+    private T _amplitude = T.One;
+    private int _cycleLength = 1;
+    private T _noiseAmplitude;
+    private Dictionary<int, T> _spikes = [];
     private double? _gapProbability;
 
     /// <summary>
@@ -159,6 +164,54 @@ public sealed class ChronoTimeSeriesGeneratorBuilder<T>
     }
 
     /// <summary>
+    /// Selects sinusoidal seasonal generation.
+    /// </summary>
+    public ChronoTimeSeriesGeneratorBuilder<T> Seasonal(T amplitude, int cycleLength, T baseline = default, T noiseAmplitude = default)
+    {
+        if (cycleLength <= 0)
+            throw new ArgumentOutOfRangeException(nameof(cycleLength), "Cycle length must be positive.");
+
+        if (noiseAmplitude < T.Zero)
+            throw new ArgumentOutOfRangeException(nameof(noiseAmplitude), "Noise amplitude must not be negative.");
+
+        _kind = ChronoGeneratorKind.Seasonal;
+        _amplitude = amplitude;
+        _cycleLength = cycleLength;
+        _baseline = baseline;
+        _noiseAmplitude = noiseAmplitude;
+        return this;
+    }
+
+    /// <summary>
+    /// Selects repeating sawtooth ramp generation.
+    /// </summary>
+    public ChronoTimeSeriesGeneratorBuilder<T> Sawtooth(T amplitude, int cycleLength, T baseline = default)
+    {
+        if (cycleLength <= 0)
+            throw new ArgumentOutOfRangeException(nameof(cycleLength), "Cycle length must be positive.");
+
+        _kind = ChronoGeneratorKind.Sawtooth;
+        _amplitude = amplitude;
+        _cycleLength = cycleLength;
+        _baseline = baseline;
+        return this;
+    }
+
+    /// <summary>
+    /// Selects baseline generation with configured impulse spikes at generated point indexes.
+    /// </summary>
+    public ChronoTimeSeriesGeneratorBuilder<T> Impulse(T baseline, params (int Index, T Value)[] spikes)
+    {
+        if (spikes.Any(spike => spike.Index < 0))
+            throw new ArgumentOutOfRangeException(nameof(spikes), "Spike indexes must not be negative.");
+
+        _kind = ChronoGeneratorKind.Impulse;
+        _baseline = baseline;
+        _spikes = spikes.ToDictionary(spike => spike.Index, spike => spike.Value);
+        return this;
+    }
+
+    /// <summary>
     /// Removes explicit points from the selected generator with the configured probability.
     /// </summary>
     public ChronoTimeSeriesGeneratorBuilder<T> Sparse(double gapProbability)
@@ -198,6 +251,9 @@ public sealed class ChronoTimeSeriesGeneratorBuilder<T>
                 ChronoGeneratorKind.RandomWalk => NextRandomWalkValue(random, i, ref walkValue),
                 ChronoGeneratorKind.LinearTrend => NextLinearTrendValue(ref trendValue),
                 ChronoGeneratorKind.StepFunction => _stepValues[Math.Min(i / _stepLength, _stepValues.Length - 1)],
+                ChronoGeneratorKind.Seasonal => NextSeasonalValue(random, i),
+                ChronoGeneratorKind.Sawtooth => NextSawtoothValue(i),
+                ChronoGeneratorKind.Impulse => _spikes.GetValueOrDefault(i, _baseline),
                 _ => throw new NotSupportedException($"Generator kind {_kind} is not supported."),
             };
 
@@ -222,6 +278,23 @@ public sealed class ChronoTimeSeriesGeneratorBuilder<T>
         return current;
     }
 
+    private T NextSeasonalValue(Random random, int index)
+    {
+        var seasonal = Math.Sin((Math.Tau * index) / _cycleLength) * double.CreateChecked(_amplitude);
+        var noise = _noiseAmplitude == T.Zero
+            ? 0.0
+            : ((random.NextDouble() * 2.0) - 1.0) * double.CreateChecked(_noiseAmplitude);
+
+        return _baseline + T.CreateChecked(seasonal + noise);
+    }
+
+    private T NextSawtoothValue(int index)
+    {
+        var position = index % _cycleLength;
+        var ramp = (double.CreateChecked(_amplitude) * position) / _cycleLength;
+        return _baseline + T.CreateChecked(ramp);
+    }
+
     private void RemoveGaps(ISparseTimeSeries<T> series)
     {
         if (_gapProbability is not { } gapProbability)
@@ -243,4 +316,7 @@ internal enum ChronoGeneratorKind
     RandomWalk,
     LinearTrend,
     StepFunction,
+    Seasonal,
+    Sawtooth,
+    Impulse,
 }
