@@ -83,6 +83,42 @@ public sealed class TimeSeriesFluentAssertionsTest
     }
 
     [Fact]
+    public void PrdCompatibleAliasesCompareSeriesAndCheckLowerBound()
+    {
+        var start = new DateTimeOffset(2026, 6, 3, 0, 0, 0, TimeSpan.Zero);
+        var expected = ChronoTimeSeriesGenerator
+            .For<double>()
+            .WithPeriod(Period.Hour)
+            .WithStart(start)
+            .WithCount(3)
+            .LinearTrend(5.0, 0.5)
+            .Build();
+        var equivalent = ChronoTimeSeriesGenerator
+            .For<double>()
+            .WithPeriod(Period.Hour)
+            .WithStart(start)
+            .WithCount(3)
+            .LinearTrend(5.02, 0.5)
+            .Build();
+        var lowerBoundViolation = ChronoTimeSeriesGenerator
+            .For<double>()
+            .WithPeriod(Period.Hour)
+            .WithStart(start)
+            .WithCount(3)
+            .LinearTrend(5.0, 0.5)
+            .Build();
+
+        equivalent.Should()
+            .BeEquivalentTo(expected, tolerance: 0.05)
+            .And.HaveAllValuesGreaterThan(4.99);
+        var equality = () => equivalent.Should().BeEquivalentTo(expected, tolerance: 0.005);
+        var lowerBound = () => lowerBoundViolation.Should().HaveAllValuesGreaterThan(5.0);
+
+        equality.Should().Throw<Exception>().WithMessage("*value mismatch*Expected 5*Actual 5.02*Tolerance 0.005*");
+        lowerBound.Should().Throw<Exception>().WithMessage("*not greater than*Threshold 5*");
+    }
+
+    [Fact]
     public void HaveNoGapsReportsMissingExplicitPeriodSlots()
     {
         var start = new DateTimeOffset(2026, 6, 4, 0, 0, 0, TimeSpan.Zero);

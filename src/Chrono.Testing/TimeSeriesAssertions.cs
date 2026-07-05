@@ -89,6 +89,14 @@ public class TimeSeriesAssertions<T> : ReferenceTypeAssertions<IReadOnlyTimeSeri
     }
 
     /// <summary>
+    /// Asserts that the sparse time series has the same period, explicit timestamps, and values as another series.
+    /// </summary>
+    public AndConstraint<TimeSeriesAssertions<T>> BeEquivalentTo(
+        IReadOnlySparseTimeSeries<T> expected,
+        T tolerance) =>
+        BeStructurallyEquivalentTo(expected, tolerance);
+
+    /// <summary>
     /// Asserts that every adjacent explicit sparse time-series point is separated by exactly one period.
     /// </summary>
     public AndConstraint<TimeSeriesAssertions<T>> HaveNoGaps()
@@ -112,6 +120,15 @@ public class TimeSeriesAssertions<T> : ReferenceTypeAssertions<IReadOnlyTimeSeri
     public AndConstraint<TimeSeriesAssertions<T>> OnlyContainValuesInRange(T min, T max)
     {
         RunAssertion(() => TimeSeriesAssert.AllValuesInRange(GetSparseSubject(), min, max));
+        return new AndConstraint<TimeSeriesAssertions<T>>(this);
+    }
+
+    /// <summary>
+    /// Asserts that every explicit sparse time-series value is strictly greater than the supplied threshold.
+    /// </summary>
+    public AndConstraint<TimeSeriesAssertions<T>> HaveAllValuesGreaterThan(T threshold)
+    {
+        RunAssertion(() => TimeSeriesAssert.AllValuesGreaterThan(GetSparseSubject(), threshold));
         return new AndConstraint<TimeSeriesAssertions<T>>(this);
     }
 
