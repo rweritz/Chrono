@@ -238,62 +238,30 @@ public sealed class ChronoTimeSeriesGeneratorBuilder<T>
 
     private void Populate(ISparseTimeSeries<T> series)
     {
-        var random = new Random(_seed);
-        var walkValue = _initialValue;
-        var trendValue = _initialValue;
+        var strategy = CreateStrategy();
 
         for (var i = 0; i < _count; i++)
+            series[TimeSeriesGeneratorBuilderSupport.AddPeriod(_start, _period, i)] = strategy.GetValue(i);
+    }
+
+    private IGeneratorStrategy<T> CreateStrategy() =>
+        _kind switch
         {
-            var value = _kind switch
-            {
-                ChronoGeneratorKind.SeededRandom => T.CreateChecked(random.Next(1, 10)),
-                ChronoGeneratorKind.Constant => _constantValue,
-                ChronoGeneratorKind.RandomWalk => NextRandomWalkValue(random, i, ref walkValue),
-                ChronoGeneratorKind.LinearTrend => NextLinearTrendValue(ref trendValue),
-                ChronoGeneratorKind.StepFunction => _stepValues[Math.Min(i / _stepLength, _stepValues.Length - 1)],
-                ChronoGeneratorKind.Seasonal => NextSeasonalValue(random, i),
-                ChronoGeneratorKind.Sawtooth => NextSawtoothValue(i),
-                ChronoGeneratorKind.Impulse => _spikes.GetValueOrDefault(i, _baseline),
-                _ => throw new NotSupportedException($"Generator kind {_kind} is not supported."),
-            };
-
-            series[TimeSeriesGeneratorBuilderSupport.AddPeriod(_start, _period, i)] = value;
-        }
-    }
-
-    private T NextRandomWalkValue(Random random, int index, ref T value)
-    {
-        if (index == 0)
-            return value;
-
-        var unitStep = T.CreateChecked((random.NextDouble() * 2.0) - 1.0);
-        value += unitStep * _volatility;
-        return value;
-    }
-
-    private T NextLinearTrendValue(ref T value)
-    {
-        var current = value;
-        value += _step;
-        return current;
-    }
-
-    private T NextSeasonalValue(Random random, int index)
-    {
-        var seasonal = Math.Sin((Math.Tau * index) / _cycleLength) * double.CreateChecked(_amplitude);
-        var noise = _noiseAmplitude == T.Zero
-            ? 0.0
-            : ((random.NextDouble() * 2.0) - 1.0) * double.CreateChecked(_noiseAmplitude);
-
-        return _baseline + T.CreateChecked(seasonal + noise);
-    }
-
-    private T NextSawtoothValue(int index)
-    {
-        var position = index % _cycleLength;
-        var ramp = (double.CreateChecked(_amplitude) * position) / _cycleLength;
-        return _baseline + T.CreateChecked(ramp);
-    }
+            ChronoGeneratorKind.SeededRandom => new SeededRandomGeneratorStrategy<T>(_seed),
+            ChronoGeneratorKind.Constant => new ConstantGeneratorStrategy<T>(_constantValue),
+            ChronoGeneratorKind.RandomWalk => new RandomWalkGeneratorStrategy<T>(_seed, _initialValue, _volatility),
+            ChronoGeneratorKind.LinearTrend => new LinearTrendGeneratorStrategy<T>(_initialValue, _step),
+            ChronoGeneratorKind.StepFunction => new StepFunctionGeneratorStrategy<T>(_stepLength, _stepValues),
+            ChronoGeneratorKind.Seasonal => new SeasonalGeneratorStrategy<T>(
+                _seed,
+                _amplitude,
+                _cycleLength,
+                _baseline,
+                _noiseAmplitude),
+            ChronoGeneratorKind.Sawtooth => new SawtoothGeneratorStrategy<T>(_amplitude, _cycleLength, _baseline),
+            ChronoGeneratorKind.Impulse => new ImpulseGeneratorStrategy<T>(_baseline, _spikes),
+            _ => throw new NotSupportedException($"Generator kind {_kind} is not supported."),
+        };
 
     private void RemoveGaps(ISparseTimeSeries<T> series)
     {

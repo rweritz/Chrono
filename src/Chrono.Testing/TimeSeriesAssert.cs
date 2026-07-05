@@ -75,6 +75,24 @@ public static class TimeSeriesAssert
     }
 
     /// <summary>
+    /// Asserts that every explicit sparse time-series value is strictly greater than the supplied threshold.
+    /// </summary>
+    public static void AllValuesGreaterThan<T>(IReadOnlySparseTimeSeries<T> series, T threshold)
+        where T : struct, INumber<T>
+    {
+        ArgumentNullException.ThrowIfNull(series);
+
+        foreach (var point in series.GetPoints())
+        {
+            if (point.Value <= threshold)
+            {
+                Fail(
+                    $"Time series value not greater than threshold at {FormatTimestamp(point.Timestamp)}. Actual {FormatValue(point.Value)}. Threshold {FormatValue(threshold)}.");
+            }
+        }
+    }
+
+    /// <summary>
     /// Asserts that a sparse time series has the expected explicit point count.
     /// </summary>
     public static void HasCount<T>(IReadOnlySparseTimeSeries<T> series, int expectedCount)

@@ -167,11 +167,12 @@ public sealed class ConstantTimeSeriesGeneratorBuilder<T>
     /// </summary>
     public ISparseTimeSeries<T> Build()
     {
-        var series = TimeSeriesGeneratorBuilderSupport.CreateSparseSeries<T>(_shape, _period, _count);
-        for (var i = 0; i < _count; i++)
-            series[TimeSeriesGeneratorBuilderSupport.AddPeriod(_start, _period, i)] = _value;
-
-        return series;
+        return TimeSeriesGeneratorBuilderSupport.BuildSparseSeries(
+            _shape,
+            _period,
+            _start,
+            _count,
+            new ConstantGeneratorStrategy<T>(_value));
     }
 }
 
@@ -278,22 +279,12 @@ public sealed class RandomWalkTimeSeriesGeneratorBuilder<T>
     /// </summary>
     public ISparseTimeSeries<T> Build()
     {
-        var series = TimeSeriesGeneratorBuilderSupport.CreateSparseSeries<T>(_shape, _period, _count);
-        var random = new Random(_seed);
-        var value = _initialValue;
-
-        for (var i = 0; i < _count; i++)
-        {
-            if (i > 0)
-            {
-                var unitStep = T.CreateChecked((random.NextDouble() * 2.0) - 1.0);
-                value += unitStep * _volatility;
-            }
-
-            series[TimeSeriesGeneratorBuilderSupport.AddPeriod(_start, _period, i)] = value;
-        }
-
-        return series;
+        return TimeSeriesGeneratorBuilderSupport.BuildSparseSeries(
+            _shape,
+            _period,
+            _start,
+            _count,
+            new RandomWalkGeneratorStrategy<T>(_seed, _initialValue, _volatility));
     }
 }
 
@@ -387,16 +378,12 @@ public sealed class LinearTrendTimeSeriesGeneratorBuilder<T>
     /// </summary>
     public ISparseTimeSeries<T> Build()
     {
-        var series = TimeSeriesGeneratorBuilderSupport.CreateSparseSeries<T>(_shape, _period, _count);
-        var value = _initialValue;
-
-        for (var i = 0; i < _count; i++)
-        {
-            series[TimeSeriesGeneratorBuilderSupport.AddPeriod(_start, _period, i)] = value;
-            value += _step;
-        }
-
-        return series;
+        return TimeSeriesGeneratorBuilderSupport.BuildSparseSeries(
+            _shape,
+            _period,
+            _start,
+            _count,
+            new LinearTrendGeneratorStrategy<T>(_initialValue, _step));
     }
 }
 
@@ -496,14 +483,12 @@ public sealed class StepFunctionTimeSeriesGeneratorBuilder<T>
     /// </summary>
     public ISparseTimeSeries<T> Build()
     {
-        var series = TimeSeriesGeneratorBuilderSupport.CreateSparseSeries<T>(_shape, _period, _count);
-        for (var i = 0; i < _count; i++)
-        {
-            var valueIndex = Math.Min(i / _stepLength, _values.Length - 1);
-            series[TimeSeriesGeneratorBuilderSupport.AddPeriod(_start, _period, i)] = _values[valueIndex];
-        }
-
-        return series;
+        return TimeSeriesGeneratorBuilderSupport.BuildSparseSeries(
+            _shape,
+            _period,
+            _start,
+            _count,
+            new StepFunctionGeneratorStrategy<T>(_stepLength, _values));
     }
 }
 
@@ -633,20 +618,12 @@ public sealed class SeasonalTimeSeriesGeneratorBuilder<T>
     /// </summary>
     public ISparseTimeSeries<T> Build()
     {
-        var series = TimeSeriesGeneratorBuilderSupport.CreateSparseSeries<T>(_shape, _period, _count);
-        var random = new Random(_seed);
-
-        for (var i = 0; i < _count; i++)
-        {
-            var seasonal = Math.Sin((Math.Tau * i) / _cycleLength) * double.CreateChecked(_amplitude);
-            var noise = _noiseAmplitude == T.Zero
-                ? 0.0
-                : ((random.NextDouble() * 2.0) - 1.0) * double.CreateChecked(_noiseAmplitude);
-            series[TimeSeriesGeneratorBuilderSupport.AddPeriod(_start, _period, i)] =
-                _baseline + T.CreateChecked(seasonal + noise);
-        }
-
-        return series;
+        return TimeSeriesGeneratorBuilderSupport.BuildSparseSeries(
+            _shape,
+            _period,
+            _start,
+            _count,
+            new SeasonalGeneratorStrategy<T>(_seed, _amplitude, _cycleLength, _baseline, _noiseAmplitude));
     }
 }
 
@@ -753,15 +730,12 @@ public sealed class SawtoothTimeSeriesGeneratorBuilder<T>
     /// </summary>
     public ISparseTimeSeries<T> Build()
     {
-        var series = TimeSeriesGeneratorBuilderSupport.CreateSparseSeries<T>(_shape, _period, _count);
-        for (var i = 0; i < _count; i++)
-        {
-            var position = i % _cycleLength;
-            var ramp = (double.CreateChecked(_amplitude) * position) / _cycleLength;
-            series[TimeSeriesGeneratorBuilderSupport.AddPeriod(_start, _period, i)] = _baseline + T.CreateChecked(ramp);
-        }
-
-        return series;
+        return TimeSeriesGeneratorBuilderSupport.BuildSparseSeries(
+            _shape,
+            _period,
+            _start,
+            _count,
+            new SawtoothGeneratorStrategy<T>(_amplitude, _cycleLength, _baseline));
     }
 }
 
@@ -858,14 +832,12 @@ public sealed class ImpulseTimeSeriesGeneratorBuilder<T>
     /// </summary>
     public ISparseTimeSeries<T> Build()
     {
-        var series = TimeSeriesGeneratorBuilderSupport.CreateSparseSeries<T>(_shape, _period, _count);
-        for (var i = 0; i < _count; i++)
-        {
-            series[TimeSeriesGeneratorBuilderSupport.AddPeriod(_start, _period, i)] =
-                _spikes.GetValueOrDefault(i, _baseline);
-        }
-
-        return series;
+        return TimeSeriesGeneratorBuilderSupport.BuildSparseSeries(
+            _shape,
+            _period,
+            _start,
+            _count,
+            new ImpulseGeneratorStrategy<T>(_baseline, _spikes));
     }
 }
 
@@ -978,6 +950,21 @@ internal static class TimeSeriesGeneratorBuilderSupport
             ChronoSeriesShape.DynamicSlot => new DynamicSlotTimeSeries<T>(period, capacity: capacity),
             _ => throw new NotSupportedException($"Series shape {shape} is not supported."),
         };
+
+    public static ISparseTimeSeries<T> BuildSparseSeries<T>(
+        ChronoSeriesShape shape,
+        Period period,
+        DateTimeOffset start,
+        int count,
+        IGeneratorStrategy<T> strategy)
+        where T : struct, INumber<T>
+    {
+        var series = CreateSparseSeries<T>(shape, period, count);
+        for (var i = 0; i < count; i++)
+            series[AddPeriod(start, period, i)] = strategy.GetValue(i);
+
+        return series;
+    }
 
     public static DateTimeOffset AddPeriod(DateTimeOffset timestamp, Period period, int count) =>
         period switch
