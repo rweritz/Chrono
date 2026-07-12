@@ -11,6 +11,7 @@ Welcome to the Chrono time series library documentation. Chrono provides high-pe
 5. [Aggregation](aggregation.md) — roll-up to coarser periods with Sum, Average, Min, Max, Count
 6. [Testing Chrono Code](testing.md) — deterministic test data generators and assertion helpers from `Chrono.Testing`
 7. [Benchmarks](benchmarks.md) — performance characteristics, results, and guidance
+8. [Choosing a Time-Series Type](choosing-a-time-series.md) — benchmark-informed storage selection by workload shape
 
 ## Overview
 

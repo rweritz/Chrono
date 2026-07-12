@@ -2,6 +2,8 @@
 
 Chrono benchmarks are organized as an advanced scenario suite. The suite replaces the legacy `TimeSeriesPerformance`, `TimeSeriesMathBenchmarks`, and `TimeSeriesAggregationBenchmarks` classes with scenario classes that cover the same storage, math, and aggregation operations while adding gapped, irregular, bounded stepwise, and mixed-family workloads.
 
+For benchmark-informed storage selection and scenario guidance, see [Choosing A Time-Series Type](choosing-a-time-series.md).
+
 All benchmark classes run through [BenchmarkDotNet](https://github.com/dotnet/BenchmarkDotNet) on .NET 10. Each scenario class is annotated with `MemoryDiagnoser`, so benchmark reports include allocation and GC columns in addition to timing data. Results are written to `BenchmarkDotNet.Artifacts/` from the repository root.
 
 ## Running Benchmarks
