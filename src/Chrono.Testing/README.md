@@ -12,7 +12,7 @@ Chrono.Testing references Chrono.TimeSeries and FluentAssertions, so test projec
 
 ## Deterministic generators
 
-Use `ChronoTimeSeriesGenerator` for a compact builder that can produce multiple Chrono sparse storage shapes.
+Use `TimeSeriesGenerator` as the primary entry point for deterministic Chrono sparse data. It starts explicit generator patterns such as constants, random walks, trends, step functions, seasonal waves, sawtooth waves, and impulses.
 
 ```csharp
 using Chrono.TimeSeries;
@@ -20,39 +20,39 @@ using Chrono.Testing;
 
 var start = new DateTimeOffset(2024, 1, 1, 0, 0, 0, TimeSpan.Zero);
 
-var series = ChronoTimeSeriesGenerator
-    .For<double>()
-    .WithPeriod(Period.Hour)
-    .StartingAt(start)
+var series = TimeSeriesGenerator
+    .RandomWalk<double>(Period.Hour)
+    .WithStart(start)
     .WithCount(4)
     .WithSeed(123)
+    .WithInitialValue(10.0)
+    .WithVolatility(0.25)
     .AsFixedSlot()
-    .RandomWalk(initialValue: 10.0, volatility: 0.25)
     .Build();
 ```
 
-Supported value flows include seeded random values, constants, random walks, linear trends, step functions, seasonal waves, sawtooth waves, impulses, and sparse gaps. Use `.AsSortedArray()`, `.AsFixedSlot()`, or `.AsDynamicSlot()` before `.Build()` to choose the materialized sparse series type.
+Use `.AsSortedArray()`, `.AsFixedSlot()`, or `.AsDynamicSlot()` before `.Build()` to choose the materialized sparse series type. `ChronoTimeSeriesGenerator.For<T>()` remains available as a compact convenience builder for one-off fixtures that set period, start, count, seed, shape, and flow in one chain.
 
 ## Sparse gaps
 
 Sparse gaps remove explicit points from the generated sparse series. The same seed and probability produce the same missing timestamps.
 
 ```csharp
-var gapped = ChronoTimeSeriesGenerator
-    .For<double>()
-    .WithPeriod(Period.Hour)
-    .StartingAt(start)
-    .WithCount(8)
+var gapped = TimeSeriesGenerator
+    .Sparse(TimeSeriesGenerator
+        .LinearTrend<double>(Period.Hour)
+        .WithStart(start)
+        .WithCount(8)
+        .WithInitialValue(10.0)
+        .WithStep(0.5))
     .WithSeed(42)
-    .LinearTrend(initialValue: 10.0, step: 0.5)
-    .Sparse(gapProbability: 0.25)
+    .WithGapProbability(0.25)
     .Build();
 ```
 
 ## Composite and waveform generators
 
-Use `TimeSeriesGenerator` when composing reusable generator objects. This example combines a linear trend with a sawtooth waveform, then removes deterministic gaps.
-The facade starts constant, random walk, linear trend, step function, seasonal, sawtooth, and impulse generators, each with storage shape selectors.
+Reusable `TimeSeriesGenerator` builders can be composed. This example combines a linear trend with a sawtooth waveform, then removes deterministic gaps.
 
 ```csharp
 var baseline = TimeSeriesGenerator
@@ -116,8 +116,9 @@ actual.Should()
     .HavePeriod(Period.Hour)
     .And.HaveCount(3)
     .And.ContainValueAt(start.AddHours(2), expectedValue: 8.0, tolerance: 0.05)
-    .And.BeStructurallyEquivalentTo(expected, tolerance: 0.05)
+    .And.BeEquivalentTo(expected, tolerance: 0.05)
+    .And.HaveAllValuesGreaterThan(4.0)
     .And.HaveNoGaps();
 ```
 
-Fluent checks also include `HaveMinDate`, `HaveMaxDate`, `HaveSumCloseTo`, and `OnlyContainValuesInRange`.
+Fluent checks also include `HaveMinDate`, `HaveMaxDate`, `HaveSumCloseTo`, `BeStructurallyEquivalentTo`, and `OnlyContainValuesInRange`.

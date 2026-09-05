@@ -32,7 +32,7 @@ Two implementations exist, both in `Chrono.TimeSeries`:
 
 **Period validation** - every implementation validates that inserted `DateTimeOffset` values align with the first-inserted value according to the `Period` enum (e.g. `FiveMinutes` requires `minute % 5 == reference.minute % 5`). Sub-minute components (second, ms, us, ns) must also match. This logic lives in `PeriodConverter`.
 
-**Benchmark focus** - current benchmark coverage compares `SortedArrayTimeSeries<double>` and `FixedSlotTimeSeries<double>` in ordered insert, ordered access, and scalar multiply scenarios.
+**Benchmark focus** - current benchmark coverage is organized by workload scenario: dense fixed-step, gapped fixed-step, sparse irregular, calendar-period, bounded stepwise, and mixed-family operations. The benchmark project uses `BenchmarkSwitcher` so filters such as `--filter *DenseFixedStep*` can run individual scenarios.
 
 ## Conventions
 
@@ -41,7 +41,7 @@ Two implementations exist, both in `Chrono.TimeSeries`:
 - **Test classes**: named `[ClassName]Test`; use xUnit `[Fact]` with FluentAssertions
 - **Custom assertions**: `TimeSeriesAssertions` extends `ReferenceTypeAssertions<ITimeSeries<double>>`; accessed via `ShouldExtensions.Should()` on `ITimeSeries<double>`
 - **Nullable + implicit usings** are enabled in all three projects
-- **Benchmark class** (`TimeSeriesPerformance`) uses `[Benchmark]`-attributed public methods; `Program.cs` calls `BenchmarkRunner.Run<TimeSeriesPerformance>()`
+- **Benchmark classes** are scenario-focused types with `[Benchmark]`-attributed public methods; `Program.cs` runs all discovered benchmarks by default and honors BenchmarkDotNet CLI filters when arguments are provided.
 
 ## Pull Request Titles
 
