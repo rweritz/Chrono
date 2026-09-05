@@ -502,6 +502,7 @@ public class TimeSeriesMathTest
     {
         var legacyMembers = new[]
         {
+            "Window",
             "ValueSpan",
             "MutableValueSpan",
             "PresenceBits",

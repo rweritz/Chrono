@@ -97,7 +97,33 @@ public sealed class DynamicSlotTimeSeries<T> : ISparseTimeSeries<T>, IEnumerable
 
     IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
 
-    internal SlotWindow<T> Window => _window;
+    internal DynamicSlotTimeSeries<TOut> AggregateSlots<TOut, TAggregator>(
+        Period targetPeriod,
+        int factor,
+        TAggregator aggregator)
+        where TOut : struct, INumber<TOut>
+        where TAggregator : struct, IAggregator<T, TOut>
+        => new(targetPeriod, AlignMode.Strict, _window.Aggregate<TOut, TAggregator>(factor, aggregator));
+
+    internal DynamicSlotTimeSeries<T> AddSlots(
+        DynamicSlotTimeSeries<T> other,
+        MissingValuePolicy policy)
+        => new(Period, AlignMode.Strict, _window.Add(other._window, policy));
+
+    internal DynamicSlotTimeSeries<T> CombineSlots(
+        DynamicSlotTimeSeries<T> other,
+        MissingValuePolicy policy,
+        Func<T, T, T> operation)
+        => new(Period, AlignMode.Strict, _window.Combine(other._window, policy, operation));
+
+    internal DynamicSlotTimeSeries<T> AddScalar(T scalar) =>
+        new(Period, AlignMode.Strict, _window.Add(scalar));
+
+    internal DynamicSlotTimeSeries<T> MultiplyScalar(T scalar) =>
+        new(Period, AlignMode.Strict, _window.Multiply(scalar));
+
+    internal DynamicSlotTimeSeries<T> DivideScalar(T scalar) =>
+        new(Period, AlignMode.Strict, _window.Divide(scalar));
 
     private DateTimeOffset Normalize(DateTimeOffset timestamp) =>
         AlignMode == AlignMode.Truncate

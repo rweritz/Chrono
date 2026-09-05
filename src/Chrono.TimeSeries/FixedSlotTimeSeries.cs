@@ -90,7 +90,33 @@ public sealed class FixedSlotTimeSeries<T> : ISparseTimeSeries<T>, IEnumerable<T
 
     IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
 
-    internal SlotWindow<T> Window => _window;
+    internal FixedSlotTimeSeries<TOut> AggregateSlots<TOut, TAggregator>(
+        Period targetPeriod,
+        int factor,
+        TAggregator aggregator)
+        where TOut : struct, INumber<TOut>
+        where TAggregator : struct, IAggregator<T, TOut>
+        => new(targetPeriod, _window.Aggregate<TOut, TAggregator>(factor, aggregator));
+
+    internal FixedSlotTimeSeries<T> AddSlots(
+        FixedSlotTimeSeries<T> other,
+        MissingValuePolicy policy)
+        => new(Period, _window.Add(other._window, policy));
+
+    internal FixedSlotTimeSeries<T> CombineSlots(
+        FixedSlotTimeSeries<T> other,
+        MissingValuePolicy policy,
+        Func<T, T, T> operation)
+        => new(Period, _window.Combine(other._window, policy, operation));
+
+    internal FixedSlotTimeSeries<T> AddScalar(T scalar) =>
+        new(Period, _window.Add(scalar));
+
+    internal FixedSlotTimeSeries<T> MultiplyScalar(T scalar) =>
+        new(Period, _window.Multiply(scalar));
+
+    internal FixedSlotTimeSeries<T> DivideScalar(T scalar) =>
+        new(Period, _window.Divide(scalar));
 
     private static void ValidatePeriod(Period period)
     {

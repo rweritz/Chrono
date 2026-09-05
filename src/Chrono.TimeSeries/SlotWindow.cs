@@ -110,6 +110,53 @@ internal sealed class SlotWindow<T>
         throw new InvalidOperationException("Series is empty.");
     }
 
+    public SlotWindow<TOut> Aggregate<TOut, TAggregator>(int factor, TAggregator aggregator)
+        where TOut : struct, INumber<TOut>
+        where TAggregator : struct, IAggregator<T, TOut>
+    {
+        if (factor <= 0)
+            throw new ArgumentOutOfRangeException(nameof(factor));
+
+        if (_length == 0)
+            return new SlotWindow<TOut>();
+
+        var firstBucket = Math.DivRem(_startSlot, factor, out var firstRemainder);
+        if (firstRemainder < 0)
+            firstBucket--;
+
+        var lastSourceSlot = _startSlot + _length - 1;
+        var lastBucket = Math.DivRem(lastSourceSlot, factor, out var lastRemainder);
+        if (lastRemainder < 0)
+            lastBucket--;
+
+        var bucketCount = checked((int)(lastBucket - firstBucket + 1));
+        var result = new SlotWindow<TOut>(bucketCount);
+
+        for (var bucket = firstBucket; bucket <= lastBucket; bucket++)
+        {
+            aggregator.Reset();
+            var count = 0;
+            var bucketStart = bucket * factor;
+            var bucketEndExclusive = bucketStart + factor;
+            var localStart = (int)Math.Max(0, bucketStart - _startSlot);
+            var localEnd = (int)Math.Min(_length, bucketEndExclusive - _startSlot);
+
+            for (var i = localStart; i < localEnd; i++)
+            {
+                if (!IsPresent(i))
+                    continue;
+
+                aggregator.Add(_values[i]);
+                count++;
+            }
+
+            if (count > 0)
+                result.Set(bucket, aggregator.Complete(count));
+        }
+
+        return result;
+    }
+
     public SlotWindow<T> Add(SlotWindow<T> other, MissingValuePolicy policy)
     {
         if (policy == MissingValuePolicy.Intersection &&

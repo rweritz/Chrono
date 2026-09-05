@@ -299,7 +299,7 @@ public static class TimeSeriesMath
         where T : struct, INumber<T>
     {
         EnsureCompatible(left, right);
-        return new FixedSlotTimeSeries<T>(left.Period, left.Window.Add(right.Window, policy));
+        return left.AddSlots(right, policy);
     }
 
     public static IReadOnlySparseTimeSeries<T> Add<T>(
@@ -574,15 +574,15 @@ public static class TimeSeriesMath
 
     public static FixedSlotTimeSeries<T> Multiply<T>(FixedSlotTimeSeries<T> input, T scalar)
         where T : struct, INumber<T>
-        => new(input.Period, input.Window.Multiply(scalar));
+        => input.MultiplyScalar(scalar);
 
     public static FixedSlotTimeSeries<T> Add<T>(FixedSlotTimeSeries<T> input, T scalar)
         where T : struct, INumber<T>
-        => new(input.Period, input.Window.Add(scalar));
+        => input.AddScalar(scalar);
 
     public static FixedSlotTimeSeries<T> Divide<T>(FixedSlotTimeSeries<T> input, T scalar)
         where T : struct, INumber<T>
-        => new(input.Period, input.Window.Divide(scalar));
+        => input.DivideScalar(scalar);
 
     public static DynamicSlotTimeSeries<T> Add<T>(
         DynamicSlotTimeSeries<T> left,
@@ -591,7 +591,7 @@ public static class TimeSeriesMath
         where T : struct, INumber<T>
     {
         EnsureCompatible(left, right);
-        return new DynamicSlotTimeSeries<T>(left.Period, AlignMode.Strict, left.Window.Add(right.Window, policy));
+        return left.AddSlots(right, policy);
     }
 
     public static DynamicSlotTimeSeries<T> Subtract<T>(
@@ -626,15 +626,15 @@ public static class TimeSeriesMath
 
     public static DynamicSlotTimeSeries<T> Multiply<T>(DynamicSlotTimeSeries<T> input, T scalar)
         where T : struct, INumber<T>
-        => new(input.Period, AlignMode.Strict, input.Window.Multiply(scalar));
+        => input.MultiplyScalar(scalar);
 
     public static DynamicSlotTimeSeries<T> Add<T>(DynamicSlotTimeSeries<T> input, T scalar)
         where T : struct, INumber<T>
-        => new(input.Period, AlignMode.Strict, input.Window.Add(scalar));
+        => input.AddScalar(scalar);
 
     public static DynamicSlotTimeSeries<T> Divide<T>(DynamicSlotTimeSeries<T> input, T scalar)
         where T : struct, INumber<T>
-        => new(input.Period, AlignMode.Strict, input.Window.Divide(scalar));
+        => input.DivideScalar(scalar);
 
     public static SortedArrayTimeSeries<T> Add<T>(
         SortedArrayTimeSeries<T> left,
@@ -718,7 +718,7 @@ public static class TimeSeriesMath
         MissingValuePolicy policy,
         Func<T, T, T> op)
         where T : struct, INumber<T>
-        => new(left.Period, left.Window.Combine(right.Window, policy, op));
+        => left.CombineSlots(right, policy, op);
 
     private static SortedArrayTimeSeries<T> MergeSparse<T>(
         IReadOnlySparseTimeSeries<T> left,
@@ -1098,7 +1098,7 @@ public static class TimeSeriesMath
         MissingValuePolicy policy,
         Func<T, T, T> op)
         where T : struct, INumber<T>
-        => new(left.Period, AlignMode.Strict, left.Window.Combine(right.Window, policy, op));
+        => left.CombineSlots(right, policy, op);
 
     private static bool TryBinaryAsSparseTarget<T, TResult>(
         IReadOnlyTimeSeries<T> left,
