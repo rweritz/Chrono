@@ -10,7 +10,7 @@ public sealed class FixedSlotTimeSeries<T> : ISparseTimeSeries<T>, IEnumerable<T
 
     public FixedSlotTimeSeries(Period period, int capacity = 0)
     {
-        if (!PeriodMath.TryGetFixedTicks(period, out _))
+        if (!PeriodGeometry.TryGetFixedTicks(period, out _))
             throw new NotSupportedException($"Use SortedArrayTimeSeries for period {period}.");
 
         Period = period;
@@ -25,7 +25,7 @@ public sealed class FixedSlotTimeSeries<T> : ISparseTimeSeries<T>, IEnumerable<T
     {
         get
         {
-            return PeriodMath.FromAbsoluteSlot(_window.FirstPresentSlot(), Period);
+            return PeriodGeometry.FromSlot(_window.FirstPresentSlot(), Period);
         }
     }
 
@@ -33,7 +33,7 @@ public sealed class FixedSlotTimeSeries<T> : ISparseTimeSeries<T>, IEnumerable<T
     {
         get
         {
-            return PeriodMath.FromAbsoluteSlot(_window.LastPresentSlot(), Period);
+            return PeriodGeometry.FromSlot(_window.LastPresentSlot(), Period);
         }
     }
 
@@ -51,7 +51,7 @@ public sealed class FixedSlotTimeSeries<T> : ISparseTimeSeries<T>, IEnumerable<T
 
     public void Set(DateTimeOffset timestamp, T value)
     {
-        var slot = PeriodMath.ToAbsoluteSlot(timestamp, Period);
+        var slot = PeriodGeometry.ToSlot(timestamp, Period);
         _window.Set(slot, value);
     }
 
@@ -60,7 +60,7 @@ public sealed class FixedSlotTimeSeries<T> : ISparseTimeSeries<T>, IEnumerable<T
 
     public bool Remove(DateTimeOffset timestamp)
     {
-        var slot = PeriodMath.ToAbsoluteSlot(timestamp, Period);
+        var slot = PeriodGeometry.ToSlot(timestamp, Period);
         return _window.Remove(slot);
     }
 
@@ -71,14 +71,14 @@ public sealed class FixedSlotTimeSeries<T> : ISparseTimeSeries<T>, IEnumerable<T
 
     public bool TryGetValue(DateTimeOffset timestamp, out T value)
     {
-        var slot = PeriodMath.ToAbsoluteSlot(timestamp, Period);
+        var slot = PeriodGeometry.ToSlot(timestamp, Period);
         return _window.TryGetValue(slot, out value);
     }
 
     public IEnumerable<TimeSeriesPoint<T>> GetPoints()
     {
         foreach (var point in _window.GetPoints())
-            yield return new TimeSeriesPoint<T>(PeriodMath.FromAbsoluteSlot(point.Slot, Period), point.Value);
+            yield return new TimeSeriesPoint<T>(PeriodGeometry.FromSlot(point.Slot, Period), point.Value);
     }
 
     public IEnumerator<TimeSeriesPoint<T>> GetEnumerator() => GetPoints().GetEnumerator();

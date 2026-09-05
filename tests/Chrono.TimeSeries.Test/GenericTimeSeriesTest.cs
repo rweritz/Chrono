@@ -109,7 +109,7 @@ public class GenericTimeSeriesTest
     [Fact]
     public void SortedArrayTimeSeries_ShouldSupportIntDoubleDecimal()
     {
-        var t1 = new DateTimeOffset(2022, 2, 6, 5, 6, 7, 8, TimeSpan.FromHours(1));
+        var t1 = new DateTimeOffset(2022, 2, 6, 5, 0, 0, TimeSpan.FromHours(1));
         var t2 = t1.AddMinutes(5);
 
         var intSeries = new SortedArrayTimeSeries<int>(Period.FiveMinutes);
