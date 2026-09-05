@@ -34,7 +34,7 @@ public sealed class DynamicSlotTimeSeries<T> : ISparseTimeSeries<T>, IEnumerable
     {
         get
         {
-            return CalendarSlotMath.FromSlot(_window.FirstPresentSlot(), Period);
+            return PeriodGeometry.FromSlot(_window.FirstPresentSlot(), Period);
         }
     }
 
@@ -42,7 +42,7 @@ public sealed class DynamicSlotTimeSeries<T> : ISparseTimeSeries<T>, IEnumerable
     {
         get
         {
-            return CalendarSlotMath.FromSlot(_window.LastPresentSlot(), Period);
+            return PeriodGeometry.FromSlot(_window.LastPresentSlot(), Period);
         }
     }
 
@@ -61,17 +61,24 @@ public sealed class DynamicSlotTimeSeries<T> : ISparseTimeSeries<T>, IEnumerable
     public void Set(DateTimeOffset timestamp, T value)
     {
         var normalized = Normalize(timestamp);
-        var slot = CalendarSlotMath.ToSlot(normalized, Period);
+        var slot = PeriodGeometry.ToSlot(normalized, Period);
         _window.Set(slot, value);
     }
 
-    public void SetSegment(DateTimeOffset startInclusive, DateTimeOffset endExclusive, T value) =>
-        SparseSegmentWriter.SetSegment(Period, startInclusive, endExclusive, value, Set);
+    public void SetSegment(DateTimeOffset startInclusive, DateTimeOffset endExclusive, T value)
+    {
+        SparseSegmentWriter.SetSegment(
+            Period,
+            Normalize(startInclusive),
+            Normalize(endExclusive),
+            value,
+            Set);
+    }
 
     public bool Remove(DateTimeOffset timestamp)
     {
         var normalized = Normalize(timestamp);
-        var slot = CalendarSlotMath.ToSlot(normalized, Period);
+        var slot = PeriodGeometry.ToSlot(normalized, Period);
         return _window.Remove(slot);
     }
 
@@ -83,14 +90,14 @@ public sealed class DynamicSlotTimeSeries<T> : ISparseTimeSeries<T>, IEnumerable
     public bool TryGetValue(DateTimeOffset timestamp, out T value)
     {
         var normalized = Normalize(timestamp);
-        var slot = CalendarSlotMath.ToSlot(normalized, Period);
+        var slot = PeriodGeometry.ToSlot(normalized, Period);
         return _window.TryGetValue(slot, out value);
     }
 
     public IEnumerable<TimeSeriesPoint<T>> GetPoints()
     {
         foreach (var point in _window.GetPoints())
-            yield return new TimeSeriesPoint<T>(CalendarSlotMath.FromSlot(point.Slot, Period), point.Value);
+            yield return new TimeSeriesPoint<T>(PeriodGeometry.FromSlot(point.Slot, Period), point.Value);
     }
 
     public IEnumerator<TimeSeriesPoint<T>> GetEnumerator() => GetPoints().GetEnumerator();
@@ -127,7 +134,7 @@ public sealed class DynamicSlotTimeSeries<T> : ISparseTimeSeries<T>, IEnumerable
 
     private DateTimeOffset Normalize(DateTimeOffset timestamp) =>
         AlignMode == AlignMode.Truncate
-            ? CalendarSlotMath.AlignToSlot(timestamp, Period)
+            ? PeriodGeometry.FloorToBucket(timestamp, Period)
             : timestamp;
 
     private static void ValidatePeriod(Period period)

@@ -22,7 +22,7 @@ Sorted parallel arrays (`long` ticks + values), with binary-search access.
 
 - Supports all periods, including `NonStandard`
 - Memory usage proportional to point count
-- Reference-based alignment validation for non-`NonStandard` periods
+- Canonical UTC-grid validation for every standard period
 
 ### DynamicSlotTimeSeries\<T\>
 
@@ -49,4 +49,4 @@ Calendar-aware slot-indexed storage for all periods except `NonStandard`.
 | Read semantics | Explicit points only | Explicit points only | Explicit points only | Dense logical reads in logical range |
 | Count surface | `ExplicitPointCount` | `ExplicitPointCount` | `ExplicitPointCount` | `LogicalSlotCount` + `ChangePointCount` |
 | Enumeration surface | `GetPoints()` | `GetPoints()` | `GetPoints()` | `GetChangePoints()` |
-| Alignment mode | Strict fixed-grid | Reference-based | Strict/Truncate | Strict |
+| Alignment mode | Strict canonical UTC grid | Strict canonical UTC grid | Canonical UTC grid, Strict/Truncate | Strict canonical UTC grid |

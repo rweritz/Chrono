@@ -53,24 +53,38 @@ These periods have variable durations (e.g., months have 28–31 days) and are h
 | `HalfYear` | Jan 1 or Jul 1 |
 | `Year` | Jan 1 |
 
-Calendar periods are supported by `SortedArrayTimeSeries<T>` and as aggregation targets.
+Calendar periods are supported by `SortedArrayTimeSeries<T>`, `DynamicSlotTimeSeries<T>`, and `StepwiseTimeSeries<T>`, and as aggregation targets.
 
-## Timestamp Alignment
+## Canonical UTC Alignment
 
-### For FixedSlotTimeSeries
+Every standard period uses the same canonical UTC grid in `SortedArrayTimeSeries`, `FixedSlotTimeSeries`, `DynamicSlotTimeSeries`, and `StepwiseTimeSeries`. Alignment is determined by the represented UTC instant, so a timestamp with a non-zero offset is accepted when its UTC instant lies on the grid. Stored and enumerated timestamps are returned in UTC.
 
-`FixedSlotTimeSeries` computes an **absolute slot index** from each timestamp using:
+Fixed-length periods compute an **absolute slot index** using:
 
 ```
 slot = (timestamp.UtcTicks - anchor) / stepTicks
 ```
 
-Where `anchor` is the Unix epoch (or January 5, 1970 for weekly alignment to Monday). If the timestamp doesn't divide evenly, an `ArgumentException` is thrown.
+Where `anchor` is the Unix epoch, except for `Week`, whose anchor is Monday, January 5, 1970 at 00:00 UTC. If the timestamp does not divide evenly, an `ArgumentException` is thrown. The resulting rules are:
+
+| Period | Canonical UTC boundary |
+|---|---|
+| `FiveMinutes` | Minute divisible by 5, with seconds and smaller components zero |
+| `QuarterHour` | Minute divisible by 15, with seconds and smaller components zero |
+| `HalfHour` | Minute 0 or 30, with seconds and smaller components zero |
+| `Hour` | Top of the UTC hour |
+| `HalfDay` | 00:00 or 12:00 UTC |
+| `Day` | 00:00 UTC |
+| `Week` | Monday at 00:00 UTC |
+| `Month` | First day of the month at 00:00 UTC |
+| `QuarterYear` | January 1, April 1, July 1, or October 1 at 00:00 UTC |
+| `HalfYear` | January 1 or July 1 at 00:00 UTC |
+| `Year` | January 1 at 00:00 UTC |
 
 This means timestamps must be exactly aligned to the period grid:
 
 ```csharp
-var series = new FixedSlotTimeSeries<double>(Period.Hour);
+var series = new SortedArrayTimeSeries<double>(Period.Hour);
 
 // ✅ Aligned to the hour
 series[new DateTimeOffset(2024, 1, 1, 12, 0, 0, TimeSpan.Zero)] = 1.0;
@@ -79,32 +93,14 @@ series[new DateTimeOffset(2024, 1, 1, 12, 0, 0, TimeSpan.Zero)] = 1.0;
 series[new DateTimeOffset(2024, 1, 1, 12, 30, 0, TimeSpan.Zero)] = 2.0;
 ```
 
-### For SortedArrayTimeSeries
+`DynamicSlotTimeSeries` with `AlignMode.Truncate` is the exception to strict input validation: it floors point inputs and both `SetSegment` boundaries to canonical bucket boundaries before operating. The other families, and `DynamicSlotTimeSeries` with `AlignMode.Strict`, reject off-grid timestamps and segment boundaries.
 
-`SortedArrayTimeSeries` uses a **reference-based validation** approach. The first timestamp inserted becomes the reference, and all subsequent timestamps must have matching sub-period components.
+`Period.NonStandard` has no grid and remains unrestricted. It is supported by `SortedArrayTimeSeries` for arbitrary timestamps.
 
-For example, with `Period.FiveMinutes`:
-- Reference: `2024-01-01T00:06:07.008+01:00`
-- Valid: any timestamp where `Minute % 5` matches, and seconds/milliseconds/microseconds/nanoseconds all match the reference
-- Invalid: `2024-01-01T00:08:00.000+01:00` (minute alignment doesn't match)
+> [!IMPORTANT]
+> This canonical model is a compatibility break from versions that let the first `SortedArrayTimeSeries` write define a reference-relative grid. A timestamp such as `2024-01-01T00:02:03Z` is now rejected immediately for `Period.FiveMinutes`, even if every later timestamp would have repeated that two-minute, three-second phase. Use canonical timestamps, truncate before writing when that matches your application policy, or use `Period.NonStandard` for genuinely irregular data.
 
-For `Period.Hour`:
-- All sub-hour components (minute, second, millisecond, microsecond, nanosecond) must match the reference
-
-For `Period.NonStandard`, no validation is performed.
-
-## Period Validation Functions
-
-The `PeriodConverter` class provides validation functions for sub-daily periods:
-
-| Period | Validation Rule |
-|---|---|
-| `FiveMinutes` | `minute % 5` matches reference, sub-minute components match |
-| `QuarterHour` | `minute % 15` matches reference, sub-minute components match |
-| `HalfHour` | `minute % 30` matches reference, sub-minute components match |
-| `Hour` | All sub-hour components match reference |
-
-`SortedArrayTimeSeries` uses reference-based period validation for all non-`NonStandard` periods.
+The former public `PeriodConverter` validation helper has been removed with this change. Alignment is now an internal invariant of the time-series implementations rather than a caller-configurable reference comparison.
 
 ## Bucket Flooring for Aggregation
 
@@ -121,4 +117,4 @@ var ts = new DateTimeOffset(2024, 3, 15, 14, 30, 0, TimeSpan.Zero);
 // Year     → 2024-01-01T00:00:00Z
 ```
 
-For fixed-length periods, truncation uses simple modulo arithmetic on UTC ticks. For weekly periods, the anchor is set to Monday, January 5, 1970 to ensure weeks start on Monday.
+For fixed-length periods, truncation uses the same UTC anchor and duration as slot validation. Weekly flooring therefore always returns Monday at 00:00 UTC, including for dates before the 1970 anchor.

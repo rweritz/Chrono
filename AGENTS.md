@@ -30,7 +30,7 @@ Two implementations exist, both in `Chrono.TimeSeries`:
 | `SortedArrayTimeSeries<T>` | Sorted parallel arrays (`long[]` keys + `T[]` values) | General-purpose sparse/irregular storage with binary-search lookup |
 | `FixedSlotTimeSeries<T>` | Fixed-step slot array + presence bitset | Fast path for fixed-tick periods with O(1) slot addressing |
 
-**Period validation** - every implementation validates that inserted `DateTimeOffset` values align with the first-inserted value according to the `Period` enum (e.g. `FiveMinutes` requires `minute % 5 == reference.minute % 5`). Sub-minute components (second, ms, us, ns) must also match. This logic lives in `PeriodConverter`.
+**Period geometry** - every standard `Period` uses one canonical UTC-aligned grid across all implementations. Weeks are Monday-aligned, calendar periods begin at their UTC calendar boundary, and `NonStandard` remains unrestricted. Validation, slot conversion, bucket flooring, and progression live in the internal `PeriodGeometry` module.
 
 **Benchmark focus** - current benchmark coverage is organized by workload scenario: dense fixed-step, gapped fixed-step, sparse irregular, calendar-period, bounded stepwise, and mixed-family operations. The benchmark project uses `BenchmarkSwitcher` so filters such as `--filter *DenseFixedStep*` can run individual scenarios.
 

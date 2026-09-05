@@ -76,6 +76,21 @@ public class DynamicSlotTimeSeriesTest
         series.ExplicitPointCount.Should().Be(0);
     }
 
+    [Theory]
+    [MemberData(nameof(TruncatedSegments))]
+    public void TruncateMode_SetSegment_ShouldFloorBoundariesBeforeWriting(
+        Period period,
+        DateTimeOffset startInclusive,
+        DateTimeOffset endExclusive,
+        DateTimeOffset[] expectedTimestamps)
+    {
+        var series = new DynamicSlotTimeSeries<int>(period, AlignMode.Truncate);
+
+        series.SetSegment(startInclusive, endExclusive, 7);
+
+        series.GetPoints().Should().Equal(expectedTimestamps.Select(timestamp => new TimeSeriesPoint<int>(timestamp, 7)));
+    }
+
     [Fact]
     public void BasicLifecycle_ShouldSupportClearAndEnumeration()
     {
@@ -147,4 +162,28 @@ public class DynamicSlotTimeSeriesTest
             Period.Year => timestamp.AddYears(1),
             _ => throw new ArgumentOutOfRangeException(nameof(period), period, null)
         };
+
+    public static TheoryData<Period, DateTimeOffset, DateTimeOffset, DateTimeOffset[]> TruncatedSegments => new()
+    {
+        {
+            Period.FiveMinutes,
+            new DateTimeOffset(2024, 1, 1, 10, 7, 0, TimeSpan.Zero),
+            new DateTimeOffset(2024, 1, 1, 10, 22, 0, TimeSpan.Zero),
+            [
+                new DateTimeOffset(2024, 1, 1, 10, 5, 0, TimeSpan.Zero),
+                new DateTimeOffset(2024, 1, 1, 10, 10, 0, TimeSpan.Zero),
+                new DateTimeOffset(2024, 1, 1, 10, 15, 0, TimeSpan.Zero)
+            ]
+        },
+        {
+            Period.Month,
+            new DateTimeOffset(2024, 2, 12, 10, 0, 0, TimeSpan.Zero),
+            new DateTimeOffset(2024, 5, 20, 10, 0, 0, TimeSpan.Zero),
+            [
+                new DateTimeOffset(2024, 2, 1, 0, 0, 0, TimeSpan.Zero),
+                new DateTimeOffset(2024, 3, 1, 0, 0, 0, TimeSpan.Zero),
+                new DateTimeOffset(2024, 4, 1, 0, 0, 0, TimeSpan.Zero)
+            ]
+        }
+    };
 }
