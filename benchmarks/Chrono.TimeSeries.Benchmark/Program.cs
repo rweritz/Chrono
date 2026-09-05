@@ -1,3 +1,12 @@
-﻿using BenchmarkDotNet.Running;
+using BenchmarkDotNet.Running;
 
-BenchmarkSwitcher.FromAssembly(typeof(Program).Assembly).RunAll();
+var switcher = BenchmarkSwitcher.FromAssembly(typeof(Program).Assembly);
+
+if (args.Length == 0)
+{
+    switcher.RunAll();
+}
+else
+{
+    switcher.Run(args);
+}
