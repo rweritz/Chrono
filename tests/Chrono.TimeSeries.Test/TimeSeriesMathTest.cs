@@ -444,6 +444,81 @@ public class TimeSeriesMathTest
         TimeSeriesMath.Add(dynamicLeft, dynamicRight).Should().BeOfType<DynamicSlotTimeSeries<int>>();
     }
 
+    [Fact]
+    public void SlotBackedMath_ShouldPreserveSparsePresenceWhenResultWindowsHaveExcessCapacity()
+    {
+        var start = new DateTimeOffset(2024, 1, 1, 0, 0, 0, TimeSpan.Zero);
+        var gap = start.AddMinutes(5);
+        var end = start.AddMinutes(10);
+
+        var fixedSlot = new FixedSlotTimeSeries<int>(Period.FiveMinutes, 256);
+        fixedSlot[start] = 2;
+        fixedSlot[end] = 6;
+
+        var dynamicSlot = new DynamicSlotTimeSeries<int>(Period.FiveMinutes, AlignMode.Strict, 256);
+        dynamicSlot[start] = 3;
+        dynamicSlot[end] = 9;
+
+        var fixedResult = TimeSeriesMath.Multiply(fixedSlot, 2);
+        var dynamicResult = TimeSeriesMath.Add(dynamicSlot, 4);
+
+        fixedResult.Should().BeOfType<FixedSlotTimeSeries<int>>();
+        fixedResult.GetPoints().Should().Equal(
+            new TimeSeriesPoint<int>(start, 4),
+            new TimeSeriesPoint<int>(end, 12));
+        fixedResult.TryGetValue(gap, out _).Should().BeFalse();
+
+        dynamicResult.Should().BeOfType<DynamicSlotTimeSeries<int>>();
+        dynamicResult.GetPoints().Should().Equal(
+            new TimeSeriesPoint<int>(start, 7),
+            new TimeSeriesPoint<int>(end, 13));
+        dynamicResult.TryGetValue(gap, out _).Should().BeFalse();
+    }
+
+    [Fact]
+    public void FixedSlotDenseAdd_ShouldConstructACompleteResultAcrossPresenceWords()
+    {
+        var start = new DateTimeOffset(2024, 1, 1, 0, 0, 0, TimeSpan.Zero);
+        var left = new FixedSlotTimeSeries<int>(Period.FiveMinutes, 130);
+        var right = new FixedSlotTimeSeries<int>(Period.FiveMinutes, 130);
+
+        for (var i = 0; i < 130; i++)
+        {
+            var timestamp = start.AddMinutes(i * 5);
+            left[timestamp] = i;
+            right[timestamp] = i * 2;
+        }
+
+        var result = TimeSeriesMath.Add(left, right);
+
+        result.Should().BeOfType<FixedSlotTimeSeries<int>>();
+        result.ExplicitPointCount.Should().Be(130);
+        result.GetPoints().Should().HaveCount(130);
+        result[start.AddMinutes(129 * 5)].Should().Be(129 * 3);
+    }
+
+    [Fact]
+    public void SlotBackedFamilies_ShouldNotExposeLegacyRawStorageHooks()
+    {
+        var legacyMembers = new[]
+        {
+            "ValueSpan",
+            "MutableValueSpan",
+            "PresenceBits",
+            "InitializeWindow",
+            "MarkPresentAt"
+        };
+
+        foreach (var type in new[] { typeof(FixedSlotTimeSeries<int>), typeof(DynamicSlotTimeSeries<int>) })
+        {
+            var memberNames = type
+                .GetMembers(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic)
+                .Select(member => member.Name);
+
+            memberNames.Should().NotContain(legacyMembers);
+        }
+    }
+
     private static MethodInfo GetSparseBinaryOverload(string methodName, Type leftType, Type rightType)
     {
         return typeof(TimeSeriesMath)

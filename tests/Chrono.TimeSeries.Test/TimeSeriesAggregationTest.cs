@@ -58,6 +58,37 @@ public class TimeSeriesAggregationTest
     }
 
     [Fact]
+    public void SlotBackedAggregation_ShouldPreserveEmptyBucketsAndConcreteFamilies()
+    {
+        var start = new DateTimeOffset(2024, 1, 1, 0, 0, 0, TimeSpan.Zero);
+        var emptyBucket = start.AddHours(1);
+        var end = start.AddHours(2);
+
+        var fixedSlot = new FixedSlotTimeSeries<int>(Period.FiveMinutes);
+        fixedSlot[start] = 2;
+        fixedSlot[end] = 6;
+
+        var dynamicSlot = new DynamicSlotTimeSeries<int>(Period.FiveMinutes);
+        dynamicSlot[start] = 3;
+        dynamicSlot[end] = 9;
+
+        var fixedResult = TimeSeriesAggregation.Sum(fixedSlot, Period.Hour);
+        var dynamicResult = TimeSeriesAggregation.Sum(dynamicSlot, Period.Hour);
+
+        fixedResult.Should().BeOfType<FixedSlotTimeSeries<int>>();
+        fixedResult.GetPoints().Should().Equal(
+            new TimeSeriesPoint<int>(start, 2),
+            new TimeSeriesPoint<int>(end, 6));
+        fixedResult.TryGetValue(emptyBucket, out _).Should().BeFalse();
+
+        dynamicResult.Should().BeOfType<DynamicSlotTimeSeries<int>>();
+        dynamicResult.GetPoints().Should().Equal(
+            new TimeSeriesPoint<int>(start, 3),
+            new TimeSeriesPoint<int>(end, 9));
+        dynamicResult.TryGetValue(emptyBucket, out _).Should().BeFalse();
+    }
+
+    [Fact]
     public void BoundedStepwiseAggregation_ShouldAggregateDenseLogicalValuesWithinLogicalRange()
     {
         var start = new DateTimeOffset(2024, 1, 1, 0, 0, 0, TimeSpan.Zero);

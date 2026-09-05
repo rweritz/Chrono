@@ -10,11 +10,16 @@ public sealed class FixedSlotTimeSeries<T> : ISparseTimeSeries<T>, IEnumerable<T
 
     public FixedSlotTimeSeries(Period period, int capacity = 0)
     {
-        if (!PeriodMath.TryGetFixedTicks(period, out _))
-            throw new NotSupportedException($"Use SortedArrayTimeSeries for period {period}.");
-
+        ValidatePeriod(period);
         Period = period;
         _window = new SlotWindow<T>(capacity);
+    }
+
+    internal FixedSlotTimeSeries(Period period, SlotWindow<T> window)
+    {
+        ValidatePeriod(period);
+        Period = period;
+        _window = window;
     }
 
     public Period Period { get; }
@@ -85,21 +90,11 @@ public sealed class FixedSlotTimeSeries<T> : ISparseTimeSeries<T>, IEnumerable<T
 
     IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
 
-    internal long StartSlot => _window.StartSlot;
+    internal SlotWindow<T> Window => _window;
 
-    internal int SlotLength => _window.Length;
-
-    internal bool IsDense => _window.IsDense;
-
-    internal ReadOnlySpan<T> ValueSpan => _window.ValueSpan;
-
-    internal Span<T> MutableValueSpan => _window.MutableValueSpan;
-
-    internal ReadOnlySpan<ulong> PresenceBits => _window.PresenceBits;
-
-    internal bool TryGetSlotValue(long slot, out T value) => _window.TryGetValue(slot, out value);
-
-    internal void InitializeWindow(long startSlot, int length) => _window.InitializeWindow(startSlot, length);
-
-    internal void MarkPresentAt(int index) => _window.MarkPresentAt(index);
+    private static void ValidatePeriod(Period period)
+    {
+        if (!PeriodMath.TryGetFixedTicks(period, out _))
+            throw new NotSupportedException($"Use SortedArrayTimeSeries for period {period}.");
+    }
 }

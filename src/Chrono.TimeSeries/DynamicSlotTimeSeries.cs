@@ -10,12 +10,18 @@ public sealed class DynamicSlotTimeSeries<T> : ISparseTimeSeries<T>, IEnumerable
 
     public DynamicSlotTimeSeries(Period period, AlignMode alignMode = AlignMode.Strict, int capacity = 0)
     {
-        if (period == Period.NonStandard)
-            throw new NotSupportedException($"Period {period} is not supported.");
-
+        ValidatePeriod(period);
         Period = period;
         AlignMode = alignMode;
         _window = new SlotWindow<T>(capacity);
+    }
+
+    internal DynamicSlotTimeSeries(Period period, AlignMode alignMode, SlotWindow<T> window)
+    {
+        ValidatePeriod(period);
+        Period = period;
+        AlignMode = alignMode;
+        _window = window;
     }
 
     public Period Period { get; }
@@ -91,27 +97,16 @@ public sealed class DynamicSlotTimeSeries<T> : ISparseTimeSeries<T>, IEnumerable
 
     IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
 
-    internal long StartSlot => _window.StartSlot;
-
-    internal int SlotLength => _window.Length;
-
-    internal bool IsDense => _window.IsDense;
-
-    internal ReadOnlySpan<T> ValueSpan => _window.ValueSpan;
-
-    internal Span<T> MutableValueSpan => _window.MutableValueSpan;
-
-    internal ReadOnlySpan<ulong> PresenceBits => _window.PresenceBits;
-
-    internal bool TryGetSlotValue(long slot, out T value) => _window.TryGetValue(slot, out value);
-
-    internal void InitializeWindow(long startSlot, int length) => _window.InitializeWindow(startSlot, length);
-
-    internal void MarkPresentAt(int index) => _window.MarkPresentAt(index);
+    internal SlotWindow<T> Window => _window;
 
     private DateTimeOffset Normalize(DateTimeOffset timestamp) =>
         AlignMode == AlignMode.Truncate
             ? CalendarSlotMath.AlignToSlot(timestamp, Period)
             : timestamp;
 
+    private static void ValidatePeriod(Period period)
+    {
+        if (period == Period.NonStandard)
+            throw new NotSupportedException($"Period {period} is not supported.");
+    }
 }
