@@ -59,8 +59,15 @@ public sealed class DynamicSlotTimeSeries<T> : ISparseTimeSeries<T>, IEnumerable
         _window.Set(slot, value);
     }
 
-    public void SetSegment(DateTimeOffset startInclusive, DateTimeOffset endExclusive, T value) =>
-        SparseSegmentWriter.SetSegment(Period, startInclusive, endExclusive, value, Set);
+    public void SetSegment(DateTimeOffset startInclusive, DateTimeOffset endExclusive, T value)
+    {
+        SparseSegmentWriter.SetSegment(
+            Period,
+            Normalize(startInclusive),
+            Normalize(endExclusive),
+            value,
+            Set);
+    }
 
     public bool Remove(DateTimeOffset timestamp)
     {
@@ -113,5 +120,4 @@ public sealed class DynamicSlotTimeSeries<T> : ISparseTimeSeries<T>, IEnumerable
         AlignMode == AlignMode.Truncate
             ? PeriodGeometry.FloorToBucket(timestamp, Period)
             : timestamp;
-
 }

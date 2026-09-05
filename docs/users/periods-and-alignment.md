@@ -93,7 +93,7 @@ series[new DateTimeOffset(2024, 1, 1, 12, 0, 0, TimeSpan.Zero)] = 1.0;
 series[new DateTimeOffset(2024, 1, 1, 12, 30, 0, TimeSpan.Zero)] = 2.0;
 ```
 
-`DynamicSlotTimeSeries` with `AlignMode.Truncate` is the exception to strict input validation: it floors input to the canonical bucket boundary before operating. The other families, and `DynamicSlotTimeSeries` with `AlignMode.Strict`, reject off-grid timestamps.
+`DynamicSlotTimeSeries` with `AlignMode.Truncate` is the exception to strict input validation: it floors point inputs and both `SetSegment` boundaries to canonical bucket boundaries before operating. The other families, and `DynamicSlotTimeSeries` with `AlignMode.Strict`, reject off-grid timestamps and segment boundaries.
 
 `Period.NonStandard` has no grid and remains unrestricted. It is supported by `SortedArrayTimeSeries` for arbitrary timestamps.
 

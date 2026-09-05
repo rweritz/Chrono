@@ -101,6 +101,37 @@ public class PeriodAlignmentTest
     }
 
     [Fact]
+    public void CalendarPeriods_ShouldRoundTripAndTruncateBeforeTheEpoch()
+    {
+        var quarterBeforeEpoch = new DateTimeOffset(1969, 10, 1, 0, 0, 0, TimeSpan.Zero);
+        var timestampBeforeEpoch = new DateTimeOffset(1969, 12, 31, 23, 59, 59, TimeSpan.Zero);
+        var strict = new DynamicSlotTimeSeries<int>(Period.QuaterYear);
+        var truncate = new DynamicSlotTimeSeries<int>(Period.QuaterYear, AlignMode.Truncate);
+
+        strict[quarterBeforeEpoch] = 3;
+        truncate[timestampBeforeEpoch] = 5;
+
+        strict.GetPoints().Should().ContainSingle()
+            .Which.Timestamp.Should().Be(quarterBeforeEpoch);
+        truncate.GetPoints().Should().ContainSingle()
+            .Which.Timestamp.Should().Be(quarterBeforeEpoch);
+    }
+
+    [Fact]
+    public void StrictSparseFamilies_ShouldRejectOffGridSegmentBoundaries()
+    {
+        var canonical = new DateTimeOffset(2024, 1, 1, 12, 0, 0, TimeSpan.Zero);
+        var offGrid = canonical.AddMinutes(30);
+
+        foreach (var series in CreateFixedSparseSeries(Period.Hour))
+        {
+            FluentActions.Invoking(() => series.SetSegment(offGrid, canonical.AddHours(2), 7))
+                .Should().Throw<ArgumentException>();
+            series.GetPoints().Should().BeEmpty();
+        }
+    }
+
+    [Fact]
     public void FixedToWeeklyAggregation_ShouldFormMondayUtcBucketsAcrossSparseFamilies()
     {
         var wednesday = new DateTimeOffset(2024, 1, 3, 12, 0, 0, TimeSpan.Zero);
