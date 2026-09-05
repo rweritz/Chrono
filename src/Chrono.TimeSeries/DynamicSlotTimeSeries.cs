@@ -6,11 +6,7 @@ namespace Chrono.TimeSeries;
 public sealed class DynamicSlotTimeSeries<T> : ISparseTimeSeries<T>, IEnumerable<TimeSeriesPoint<T>>
     where T : struct, INumber<T>
 {
-    private long _startSlot;
-    private int _length;
-    private int _count;
-    private T[] _values;
-    private ulong[] _presentBits;
+    private readonly SlotWindow<T> _window;
 
     public DynamicSlotTimeSeries(Period period, AlignMode alignMode = AlignMode.Strict, int capacity = 0)
     {
@@ -19,24 +15,20 @@ public sealed class DynamicSlotTimeSeries<T> : ISparseTimeSeries<T>, IEnumerable
 
         Period = period;
         AlignMode = alignMode;
-        _values = capacity == 0 ? Array.Empty<T>() : GC.AllocateUninitializedArray<T>(capacity);
-        _presentBits = capacity == 0 ? Array.Empty<ulong>() : new ulong[(capacity + 63) >> 6];
+        _window = new SlotWindow<T>(capacity);
     }
 
     public Period Period { get; }
 
     public AlignMode AlignMode { get; }
 
-    public int ExplicitPointCount => _count;
+    public int ExplicitPointCount => _window.Count;
 
     public DateTimeOffset MinDate
     {
         get
         {
-            if (_count == 0)
-                throw new InvalidOperationException("Series is empty.");
-
-            return CalendarSlotMath.FromSlot(_startSlot + FirstPresentIndex(), Period);
+            return CalendarSlotMath.FromSlot(_window.FirstPresentSlot(), Period);
         }
     }
 
@@ -44,10 +36,7 @@ public sealed class DynamicSlotTimeSeries<T> : ISparseTimeSeries<T>, IEnumerable
     {
         get
         {
-            if (_count == 0)
-                throw new InvalidOperationException("Series is empty.");
-
-            return CalendarSlotMath.FromSlot(_startSlot + LastPresentIndex(), Period);
+            return CalendarSlotMath.FromSlot(_window.LastPresentSlot(), Period);
         }
     }
 
@@ -67,14 +56,7 @@ public sealed class DynamicSlotTimeSeries<T> : ISparseTimeSeries<T>, IEnumerable
     {
         var normalized = Normalize(timestamp);
         var slot = CalendarSlotMath.ToSlot(normalized, Period);
-        var index = EnsureSlot(slot);
-
-        _values[index] = value;
-        if (!IsPresent(index))
-        {
-            MarkPresent(index);
-            _count++;
-        }
+        _window.Set(slot, value);
     }
 
     public void SetSegment(DateTimeOffset startInclusive, DateTimeOffset endExclusive, T value) =>
@@ -84,202 +66,52 @@ public sealed class DynamicSlotTimeSeries<T> : ISparseTimeSeries<T>, IEnumerable
     {
         var normalized = Normalize(timestamp);
         var slot = CalendarSlotMath.ToSlot(normalized, Period);
-        var index64 = slot - _startSlot;
-
-        if ((ulong)index64 >= (ulong)_length)
-            return false;
-
-        var index = (int)index64;
-        if (!IsPresent(index))
-            return false;
-
-        _values[index] = T.Zero;
-        ClearPresent(index);
-        _count--;
-        return true;
+        return _window.Remove(slot);
     }
 
     public void Clear()
     {
-        Array.Clear(_values, 0, _length);
-        Array.Clear(_presentBits, 0, _presentBits.Length);
-        _count = 0;
+        _window.Clear();
     }
 
     public bool TryGetValue(DateTimeOffset timestamp, out T value)
     {
         var normalized = Normalize(timestamp);
         var slot = CalendarSlotMath.ToSlot(normalized, Period);
-        var index64 = slot - _startSlot;
-
-        if ((ulong)index64 >= (ulong)_length)
-        {
-            value = T.Zero;
-            return false;
-        }
-
-        var index = (int)index64;
-        if (!IsPresent(index))
-        {
-            value = T.Zero;
-            return false;
-        }
-
-        value = _values[index];
-        return true;
+        return _window.TryGetValue(slot, out value);
     }
 
     public IEnumerable<TimeSeriesPoint<T>> GetPoints()
     {
-        for (var i = 0; i < _length; i++)
-        {
-            if (!IsPresent(i))
-                continue;
-
-            yield return new TimeSeriesPoint<T>(
-                CalendarSlotMath.FromSlot(_startSlot + i, Period),
-                _values[i]);
-        }
+        foreach (var point in _window.GetPoints())
+            yield return new TimeSeriesPoint<T>(CalendarSlotMath.FromSlot(point.Slot, Period), point.Value);
     }
 
     public IEnumerator<TimeSeriesPoint<T>> GetEnumerator() => GetPoints().GetEnumerator();
 
     IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
 
-    internal long StartSlot => _startSlot;
+    internal long StartSlot => _window.StartSlot;
 
-    internal int SlotLength => _length;
+    internal int SlotLength => _window.Length;
 
-    internal bool IsDense => _count == _length;
+    internal bool IsDense => _window.IsDense;
 
-    internal ReadOnlySpan<T> ValueSpan => _values.AsSpan(0, _length);
+    internal ReadOnlySpan<T> ValueSpan => _window.ValueSpan;
 
-    internal Span<T> MutableValueSpan => _values.AsSpan(0, _length);
+    internal Span<T> MutableValueSpan => _window.MutableValueSpan;
 
-    internal ReadOnlySpan<ulong> PresenceBits => _presentBits;
+    internal ReadOnlySpan<ulong> PresenceBits => _window.PresenceBits;
 
-    internal bool TryGetSlotValue(long slot, out T value)
-    {
-        var index64 = slot - _startSlot;
-        if ((ulong)index64 >= (ulong)_length)
-        {
-            value = T.Zero;
-            return false;
-        }
+    internal bool TryGetSlotValue(long slot, out T value) => _window.TryGetValue(slot, out value);
 
-        var index = (int)index64;
-        if (!IsPresent(index))
-        {
-            value = T.Zero;
-            return false;
-        }
+    internal void InitializeWindow(long startSlot, int length) => _window.InitializeWindow(startSlot, length);
 
-        value = _values[index];
-        return true;
-    }
-
-    internal void InitializeWindow(long startSlot, int length)
-    {
-        EnsureCapacity(length);
-        _startSlot = startSlot;
-        _length = length;
-        _count = 0;
-        Array.Clear(_values, 0, _length);
-        Array.Clear(_presentBits, 0, _presentBits.Length);
-    }
-
-    internal void MarkPresentAt(int index)
-    {
-        if (!IsPresent(index))
-        {
-            MarkPresent(index);
-            _count++;
-        }
-    }
+    internal void MarkPresentAt(int index) => _window.MarkPresentAt(index);
 
     private DateTimeOffset Normalize(DateTimeOffset timestamp) =>
         AlignMode == AlignMode.Truncate
             ? CalendarSlotMath.AlignToSlot(timestamp, Period)
             : timestamp;
 
-    private int EnsureSlot(long slot)
-    {
-        if (_length == 0)
-        {
-            EnsureCapacity(1);
-            _startSlot = slot;
-            _length = 1;
-            return 0;
-        }
-
-        if (slot < _startSlot)
-            GrowLeft(checked((int)(_startSlot - slot)));
-        else if (slot >= _startSlot + _length)
-            GrowRight(checked((int)(slot - (_startSlot + _length) + 1)));
-
-        return checked((int)(slot - _startSlot));
-    }
-
-    private void EnsureCapacity(int min)
-    {
-        if (_values.Length >= min)
-            return;
-
-        var newCapacity = Math.Max(min, Math.Max(4, _values.Length * 2));
-        Array.Resize(ref _values, newCapacity);
-        Array.Resize(ref _presentBits, (newCapacity + 63) >> 6);
-    }
-
-    private void GrowRight(int extra)
-    {
-        var newLength = checked(_length + extra);
-        EnsureCapacity(newLength);
-        _length = newLength;
-    }
-
-    private void GrowLeft(int extra)
-    {
-        var newLength = checked(_length + extra);
-        EnsureCapacity(newLength);
-
-        Array.Copy(_values, 0, _values, extra, _length);
-
-        var oldBits = _presentBits;
-        _presentBits = new ulong[(newLength + 63) >> 6];
-        for (var i = 0; i < _length; i++)
-        {
-            if (((oldBits[i >> 6] >> (i & 63)) & 1UL) != 0)
-                _presentBits[(i + extra) >> 6] |= 1UL << ((i + extra) & 63);
-        }
-
-        _startSlot -= extra;
-        _length = newLength;
-    }
-
-    private bool IsPresent(int index) =>
-        ((_presentBits[index >> 6] >> (index & 63)) & 1UL) != 0;
-
-    private void MarkPresent(int index) =>
-        _presentBits[index >> 6] |= 1UL << (index & 63);
-
-    private void ClearPresent(int index) =>
-        _presentBits[index >> 6] &= ~(1UL << (index & 63));
-
-    private int FirstPresentIndex()
-    {
-        for (var i = 0; i < _length; i++)
-            if (IsPresent(i))
-                return i;
-
-        throw new InvalidOperationException("Series is empty.");
-    }
-
-    private int LastPresentIndex()
-    {
-        for (var i = _length - 1; i >= 0; i--)
-            if (IsPresent(i))
-                return i;
-
-        throw new InvalidOperationException("Series is empty.");
-    }
 }
