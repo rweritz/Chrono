@@ -66,7 +66,7 @@ public class TimeSeriesMathTest
     [Fact]
     public void SortedArray_Add_Subtract_Multiply_Divide_ShouldWorkWithIntersection()
     {
-        var t0 = new DateTimeOffset(2022, 2, 6, 5, 6, 7, 8, TimeSpan.FromHours(1));
+        var t0 = new DateTimeOffset(2022, 2, 6, 5, 0, 0, TimeSpan.FromHours(1));
         var t1 = t0.AddMinutes(5);
         var t2 = t1.AddMinutes(5);
 
@@ -93,7 +93,7 @@ public class TimeSeriesMathTest
     [Fact]
     public void SortedArray_UnionWithZero_ShouldIncludeAllKeys()
     {
-        var t0 = new DateTimeOffset(2022, 2, 6, 5, 6, 7, 8, TimeSpan.FromHours(1));
+        var t0 = new DateTimeOffset(2022, 2, 6, 5, 0, 0, TimeSpan.FromHours(1));
         var t1 = t0.AddMinutes(5);
 
         var a = new SortedArrayTimeSeries<int>(Period.FiveMinutes);
@@ -112,7 +112,7 @@ public class TimeSeriesMathTest
     [Fact]
     public void ScalarOperations_ShouldWork()
     {
-        var t0 = new DateTimeOffset(2022, 2, 6, 5, 6, 7, 8, TimeSpan.FromHours(1));
+        var t0 = new DateTimeOffset(2022, 2, 6, 5, 0, 0, TimeSpan.FromHours(1));
         var t1 = t0.AddMinutes(5);
 
         var source = new SortedArrayTimeSeries<decimal>(Period.FiveMinutes);

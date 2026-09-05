@@ -8,7 +8,7 @@ A high-performance time series library for .NET, built on .NET 10 and `System.Nu
 - **Three sparse storage strategies** — `FixedSlotTimeSeries<T>`, `SortedArrayTimeSeries<T>`, `DynamicSlotTimeSeries<T>`
 - **Bounded stepwise series** — `StepwiseTimeSeries<T>` for dense logical reads with compressed change-points
 - **Calendar-aware storage** — `DynamicSlotTimeSeries<T>` with calendar-smart slot math for months, quarters, and years
-- **Period alignment** — built-in periods from 5 minutes to yearly, with automatic timestamp validation and optional truncation (`AlignMode`)
+- **Period alignment** — one canonical UTC grid from 5 minutes to yearly, with Monday weeks and optional truncation (`AlignMode`)
 - **Arithmetic operations** — element-wise Add, Subtract, Multiply, Divide between series, plus scalar operations
 - **SIMD-accelerated math** — vectorized fast paths for `double` and `int` operations
 - **Flexible aggregation** — Sum, Average, Min, Max, Count across time buckets (fixed and calendar-based)

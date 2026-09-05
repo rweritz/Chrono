@@ -16,8 +16,8 @@ public sealed class StepwiseTimeSeries<T> : IBoundedStepwiseTimeSeries<T>
         if (period == Period.NonStandard)
             throw new NotSupportedException($"Period {period} is not supported.");
 
-        var startSlot = CalendarSlotMath.ToSlot(logicalRangeStart, period);
-        var endSlot = CalendarSlotMath.ToSlot(logicalRangeEnd, period);
+        var startSlot = PeriodGeometry.ToSlot(logicalRangeStart, period);
+        var endSlot = PeriodGeometry.ToSlot(logicalRangeEnd, period);
         if (endSlot < startSlot)
             throw new ArgumentOutOfRangeException(nameof(logicalRangeEnd), "Logical range end must not precede the logical range start.");
 
@@ -36,13 +36,13 @@ public sealed class StepwiseTimeSeries<T> : IBoundedStepwiseTimeSeries<T>
 
     public Period Period { get; }
 
-    public DateTimeOffset MinDate => CalendarSlotMath.FromSlot(_changePointSlots[0], Period);
+    public DateTimeOffset MinDate => PeriodGeometry.FromSlot(_changePointSlots[0], Period);
 
-    public DateTimeOffset MaxDate => CalendarSlotMath.FromSlot(_changePointSlots[^1], Period);
+    public DateTimeOffset MaxDate => PeriodGeometry.FromSlot(_changePointSlots[^1], Period);
 
-    public DateTimeOffset LogicalRangeStart => CalendarSlotMath.FromSlot(_logicalRangeStartSlot, Period);
+    public DateTimeOffset LogicalRangeStart => PeriodGeometry.FromSlot(_logicalRangeStartSlot, Period);
 
-    public DateTimeOffset LogicalRangeEnd => CalendarSlotMath.FromSlot(_logicalRangeEndSlot, Period);
+    public DateTimeOffset LogicalRangeEnd => PeriodGeometry.FromSlot(_logicalRangeEndSlot, Period);
 
     public int LogicalSlotCount => checked((int)(_logicalRangeEndSlot - _logicalRangeStartSlot + 1));
 
@@ -62,14 +62,14 @@ public sealed class StepwiseTimeSeries<T> : IBoundedStepwiseTimeSeries<T>
 
     public void Set(DateTimeOffset timestamp, T value)
     {
-        var slot = CalendarSlotMath.ToSlot(timestamp, Period);
+        var slot = PeriodGeometry.ToSlot(timestamp, Period);
         SetSlotRange(slot, slot, value);
     }
 
     public void SetSegment(DateTimeOffset startInclusive, DateTimeOffset endExclusive, T value)
     {
-        var startSlot = CalendarSlotMath.ToSlot(startInclusive, Period);
-        var endExclusiveSlot = CalendarSlotMath.ToSlot(endExclusive, Period);
+        var startSlot = PeriodGeometry.ToSlot(startInclusive, Period);
+        var endExclusiveSlot = PeriodGeometry.ToSlot(endExclusive, Period);
         if (endExclusiveSlot <= startSlot)
         {
             throw new ArgumentOutOfRangeException(
@@ -95,7 +95,7 @@ public sealed class StepwiseTimeSeries<T> : IBoundedStepwiseTimeSeries<T>
 
     public bool TryGetValue(DateTimeOffset timestamp, out T value)
     {
-        var slot = CalendarSlotMath.ToSlot(timestamp, Period);
+        var slot = PeriodGeometry.ToSlot(timestamp, Period);
         if (slot < _logicalRangeStartSlot || slot > _logicalRangeEndSlot)
         {
             value = T.Zero;
@@ -109,7 +109,7 @@ public sealed class StepwiseTimeSeries<T> : IBoundedStepwiseTimeSeries<T>
     public IEnumerable<TimeSeriesPoint<T>> GetChangePoints()
     {
         for (var i = 0; i < _changePointSlots.Count; i++)
-            yield return new TimeSeriesPoint<T>(CalendarSlotMath.FromSlot(_changePointSlots[i], Period), _changePointValues[i]);
+            yield return new TimeSeriesPoint<T>(PeriodGeometry.FromSlot(_changePointSlots[i], Period), _changePointValues[i]);
     }
 
     private void SetSlotRange(long startSlot, long endSlot, T value)

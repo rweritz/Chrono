@@ -1097,10 +1097,10 @@ public static class TimeSeriesMath
         Func<T, T, T> op)
         where T : struct, INumber<T>
     {
-        var leftStart = CalendarSlotMath.ToSlot(left.LogicalRangeStart, left.Period);
-        var leftEnd = CalendarSlotMath.ToSlot(left.LogicalRangeEnd, left.Period);
-        var rightStart = CalendarSlotMath.ToSlot(right.LogicalRangeStart, right.Period);
-        var rightEnd = CalendarSlotMath.ToSlot(right.LogicalRangeEnd, right.Period);
+        var leftStart = PeriodGeometry.ToSlot(left.LogicalRangeStart, left.Period);
+        var leftEnd = PeriodGeometry.ToSlot(left.LogicalRangeEnd, left.Period);
+        var rightStart = PeriodGeometry.ToSlot(right.LogicalRangeStart, right.Period);
+        var rightEnd = PeriodGeometry.ToSlot(right.LogicalRangeEnd, right.Period);
 
         long resultStart;
         long resultEnd;
@@ -1136,7 +1136,7 @@ public static class TimeSeriesMath
 
         return BuildStepwiseResult(left.Period, resultStart, resultEnd, slot =>
         {
-            var timestamp = CalendarSlotMath.FromSlot(slot, left.Period);
+            var timestamp = PeriodGeometry.FromSlot(slot, left.Period);
             var hasLeft = left.TryGetValue(timestamp, out var leftValue);
             var hasRight = right.TryGetValue(timestamp, out var rightValue);
 
@@ -1150,12 +1150,12 @@ public static class TimeSeriesMath
         T operand)
         where T : struct, INumber<T>
     {
-        var startSlot = CalendarSlotMath.ToSlot(source.LogicalRangeStart, source.Period);
-        var endSlot = CalendarSlotMath.ToSlot(source.LogicalRangeEnd, source.Period);
+        var startSlot = PeriodGeometry.ToSlot(source.LogicalRangeStart, source.Period);
+        var endSlot = PeriodGeometry.ToSlot(source.LogicalRangeEnd, source.Period);
 
         return BuildStepwiseResult(source.Period, startSlot, endSlot, slot =>
         {
-            var timestamp = CalendarSlotMath.FromSlot(slot, source.Period);
+            var timestamp = PeriodGeometry.FromSlot(slot, source.Period);
             return op(source[timestamp], operand);
         });
     }
@@ -1167,8 +1167,8 @@ public static class TimeSeriesMath
         Func<long, T> valueFactory)
         where T : struct, INumber<T>
     {
-        var start = CalendarSlotMath.FromSlot(startSlot, period);
-        var end = CalendarSlotMath.FromSlot(endSlot, period);
+        var start = PeriodGeometry.FromSlot(startSlot, period);
+        var end = PeriodGeometry.FromSlot(endSlot, period);
         var currentValue = valueFactory(startSlot);
         var result = new StepwiseTimeSeries<T>(period, start, end, currentValue);
         var runStart = startSlot;
@@ -1182,8 +1182,8 @@ public static class TimeSeriesMath
             if (runStart > startSlot)
             {
                 result.SetSegment(
-                    CalendarSlotMath.FromSlot(runStart, period),
-                    CalendarSlotMath.FromSlot(slot, period),
+                    PeriodGeometry.FromSlot(runStart, period),
+                    PeriodGeometry.FromSlot(slot, period),
                     currentValue);
             }
 
@@ -1194,8 +1194,8 @@ public static class TimeSeriesMath
         if (runStart > startSlot)
         {
             result.SetSegment(
-                CalendarSlotMath.FromSlot(runStart, period),
-                CalendarSlotMath.FromSlot(endSlot + 1, period),
+                PeriodGeometry.FromSlot(runStart, period),
+                PeriodGeometry.FromSlot(endSlot + 1, period),
                 currentValue);
         }
 
@@ -1398,7 +1398,7 @@ public static class TimeSeriesMath
         {
             TimeSeriesSpecializationTarget.FixedSlot =>
                 semanticFamily == TimeSeriesSemanticFamily.Sparse &&
-                PeriodMath.TryGetFixedTicks(resultPeriod, out _),
+                PeriodGeometry.TryGetFixedTicks(resultPeriod, out _),
             TimeSeriesSpecializationTarget.DynamicSlot =>
                 semanticFamily == TimeSeriesSemanticFamily.Sparse,
             TimeSeriesSpecializationTarget.BoundedStepwise =>

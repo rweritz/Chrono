@@ -151,12 +151,12 @@ public static class TimeSeriesAggregation
         if (source.ExplicitPointCount == 0)
             return new FixedSlotTimeSeries<TOut>(targetPeriod);
 
-        if (PeriodMath.TryGetFixedTicks(source.Period, out var sourceTicks) &&
-            PeriodMath.TryGetFixedTicks(targetPeriod, out var targetTicks) &&
+        if (PeriodGeometry.TryGetFixedTicks(source.Period, out var sourceTicks) &&
+            PeriodGeometry.TryGetFixedTicks(targetPeriod, out var targetTicks) &&
             targetTicks >= sourceTicks &&
             targetTicks % sourceTicks == 0)
         {
-            return AggregateFixed<TIn, TOut, TAggregator>(source, targetPeriod, sourceTicks, targetTicks, aggregator);
+            return AggregateFixed<TIn, TOut, TAggregator>(source, targetPeriod, aggregator);
         }
 
         return AggregateCalendar<TIn, TOut, TAggregator>(source, targetPeriod, aggregator);
@@ -206,10 +206,7 @@ public static class TimeSeriesAggregation
 
         DateTimeOffset FirstBucket(DateTimeOffset ts)
         {
-            if (PeriodMath.TryGetFixedTicks(targetPeriod, out _))
-                return PeriodMath.TruncateToFixedBucket(ts, targetPeriod);
-
-            return PeriodMath.FloorToCalendarBucket(ts, targetPeriod);
+            return PeriodGeometry.FloorToBucket(ts, targetPeriod);
         }
 
         var currentBucket = FirstBucket(new DateTimeOffset(keys[0], TimeSpan.Zero));
@@ -283,12 +280,12 @@ public static class TimeSeriesAggregation
         if (source.ExplicitPointCount == 0)
             return new DynamicSlotTimeSeries<TOut>(targetPeriod);
 
-        if (PeriodMath.TryGetFixedTicks(source.Period, out var sourceTicks) &&
-            PeriodMath.TryGetFixedTicks(targetPeriod, out var targetTicks) &&
+        if (PeriodGeometry.TryGetFixedTicks(source.Period, out var sourceTicks) &&
+            PeriodGeometry.TryGetFixedTicks(targetPeriod, out var targetTicks) &&
             targetTicks >= sourceTicks &&
             targetTicks % sourceTicks == 0)
         {
-            return AggregateFixed<TIn, TOut, TAggregator>(source, targetPeriod, sourceTicks, targetTicks, aggregator);
+            return AggregateFixed<TIn, TOut, TAggregator>(source, targetPeriod, aggregator);
         }
 
         return AggregateCalendar<TIn, TOut, TAggregator>(source, targetPeriod, aggregator);
@@ -428,8 +425,8 @@ public static class TimeSeriesAggregation
         if (targetPeriod == Period.NonStandard)
             throw new NotSupportedException($"Period {targetPeriod} is not supported.");
 
-        var startSlot = CalendarSlotMath.ToSlot(source.LogicalRangeStart, source.Period);
-        var endSlot = CalendarSlotMath.ToSlot(source.LogicalRangeEnd, source.Period);
+        var startSlot = PeriodGeometry.ToSlot(source.LogicalRangeStart, source.Period);
+        var endSlot = PeriodGeometry.ToSlot(source.LogicalRangeEnd, source.Period);
         var buckets = new List<(long BucketSlot, TOut Value)>();
 
         long? currentBucketSlot = null;
@@ -437,8 +434,8 @@ public static class TimeSeriesAggregation
 
         for (var slot = startSlot; slot <= endSlot; slot++)
         {
-            var timestamp = CalendarSlotMath.FromSlot(slot, source.Period);
-            var bucketSlot = CalendarSlotMath.ToSlot(CalendarSlotMath.AlignToSlot(timestamp, targetPeriod), targetPeriod);
+            var timestamp = PeriodGeometry.FromSlot(slot, source.Period);
+            var bucketSlot = PeriodGeometry.ToSlot(PeriodGeometry.FloorToBucket(timestamp, targetPeriod), targetPeriod);
 
             if (currentBucketSlot != bucketSlot)
             {
@@ -462,10 +459,7 @@ public static class TimeSeriesAggregation
 
     private static DateTimeOffset FirstBucket(DateTimeOffset timestamp, Period targetPeriod)
     {
-        if (PeriodMath.TryGetFixedTicks(targetPeriod, out _))
-            return PeriodMath.TruncateToFixedBucket(timestamp, targetPeriod);
-
-        return PeriodMath.FloorToCalendarBucket(timestamp, targetPeriod);
+        return PeriodGeometry.FloorToBucket(timestamp, targetPeriod);
     }
 
     private static StepwiseTimeSeries<T> CreateStepwiseResult<T>(Period targetPeriod, IReadOnlyList<(long BucketSlot, T Value)> buckets)
@@ -474,8 +468,8 @@ public static class TimeSeriesAggregation
         if (buckets.Count == 0)
             throw new InvalidOperationException("Bounded stepwise aggregation requires at least one bucket.");
 
-        var start = CalendarSlotMath.FromSlot(buckets[0].BucketSlot, targetPeriod);
-        var end = CalendarSlotMath.FromSlot(buckets[^1].BucketSlot, targetPeriod);
+        var start = PeriodGeometry.FromSlot(buckets[0].BucketSlot, targetPeriod);
+        var end = PeriodGeometry.FromSlot(buckets[^1].BucketSlot, targetPeriod);
         var result = new StepwiseTimeSeries<T>(targetPeriod, start, end, buckets[0].Value);
 
         var runStartIndex = 0;
@@ -487,8 +481,8 @@ public static class TimeSeriesAggregation
             if (runStartIndex > 0)
             {
                 result.SetSegment(
-                    CalendarSlotMath.FromSlot(buckets[runStartIndex].BucketSlot, targetPeriod),
-                    CalendarSlotMath.FromSlot(buckets[i].BucketSlot, targetPeriod),
+                    PeriodGeometry.FromSlot(buckets[runStartIndex].BucketSlot, targetPeriod),
+                    PeriodGeometry.FromSlot(buckets[i].BucketSlot, targetPeriod),
                     buckets[runStartIndex].Value);
             }
 
@@ -498,8 +492,8 @@ public static class TimeSeriesAggregation
         if (runStartIndex > 0)
         {
             result.SetSegment(
-                CalendarSlotMath.FromSlot(buckets[runStartIndex].BucketSlot, targetPeriod),
-                CalendarSlotMath.FromSlot(buckets[^1].BucketSlot + 1, targetPeriod),
+                PeriodGeometry.FromSlot(buckets[runStartIndex].BucketSlot, targetPeriod),
+                PeriodGeometry.FromSlot(buckets[^1].BucketSlot + 1, targetPeriod),
                 buckets[runStartIndex].Value);
         }
 
@@ -509,22 +503,16 @@ public static class TimeSeriesAggregation
     private static FixedSlotTimeSeries<TOut> AggregateFixed<TIn, TOut, TAggregator>(
         FixedSlotTimeSeries<TIn> source,
         Period targetPeriod,
-        long sourceTicks,
-        long targetTicks,
         TAggregator aggregator)
         where TIn : struct, INumber<TIn>
         where TOut : struct, INumber<TOut>
         where TAggregator : struct, IAggregator<TIn, TOut>
     {
-        var factor = checked((int)(targetTicks / sourceTicks));
-        var firstBucket = Math.DivRem(source.StartSlot, factor, out var remStart);
-        if (remStart < 0)
-            firstBucket--;
-
+        var firstTimestamp = PeriodGeometry.FromSlot(source.StartSlot, source.Period);
+        var firstBucket = PeriodGeometry.ToSlot(PeriodGeometry.FloorToBucket(firstTimestamp, targetPeriod), targetPeriod);
         var lastSourceSlot = source.StartSlot + source.SlotLength - 1;
-        var lastBucket = Math.DivRem(lastSourceSlot, factor, out var remEnd);
-        if (remEnd < 0)
-            lastBucket--;
+        var lastTimestamp = PeriodGeometry.FromSlot(lastSourceSlot, source.Period);
+        var lastBucket = PeriodGeometry.ToSlot(PeriodGeometry.FloorToBucket(lastTimestamp, targetPeriod), targetPeriod);
 
         var bucketCount = checked((int)(lastBucket - firstBucket + 1));
         var result = new FixedSlotTimeSeries<TOut>(targetPeriod, bucketCount);
@@ -535,8 +523,11 @@ public static class TimeSeriesAggregation
             aggregator.Reset();
             var count = 0;
 
-            var bucketStart = bucket * factor;
-            var bucketEndExclusive = bucketStart + factor;
+            var bucketTimestamp = PeriodGeometry.FromSlot(bucket, targetPeriod);
+            var bucketStart = PeriodGeometry.ToSlot(bucketTimestamp, source.Period);
+            var bucketEndExclusive = PeriodGeometry.ToSlot(
+                PeriodGeometry.AddPeriods(bucketTimestamp, targetPeriod),
+                source.Period);
 
             var localStart = (int)Math.Max(0, bucketStart - source.StartSlot);
             var localEnd = (int)Math.Min(source.SlotLength, bucketEndExclusive - source.StartSlot);
@@ -572,7 +563,7 @@ public static class TimeSeriesAggregation
         var temp = new SortedDictionary<long, (TAggregator Aggregator, int Count)>();
         foreach (var point in source)
         {
-            var bucket = PeriodMath.FloorToCalendarBucket(point.Timestamp, targetPeriod).UtcTicks;
+            var bucket = PeriodGeometry.FloorToBucket(point.Timestamp, targetPeriod).UtcTicks;
             if (!temp.TryGetValue(bucket, out var state))
             {
                 state = (aggregator, 0);
@@ -589,15 +580,15 @@ public static class TimeSeriesAggregation
             return result;
 
         var firstBucketTick = temp.First().Key;
-        var firstSlot = PeriodMath.ToAbsoluteSlot(new DateTimeOffset(firstBucketTick, TimeSpan.Zero), targetPeriod);
+        var firstSlot = PeriodGeometry.ToSlot(new DateTimeOffset(firstBucketTick, TimeSpan.Zero), targetPeriod);
         var lastBucketTick = temp.Last().Key;
-        var lastSlot = PeriodMath.ToAbsoluteSlot(new DateTimeOffset(lastBucketTick, TimeSpan.Zero), targetPeriod);
+        var lastSlot = PeriodGeometry.ToSlot(new DateTimeOffset(lastBucketTick, TimeSpan.Zero), targetPeriod);
         var len = checked((int)(lastSlot - firstSlot + 1));
         result.InitializeWindow(firstSlot, len);
 
         foreach (var kvp in temp)
         {
-            var slot = PeriodMath.ToAbsoluteSlot(new DateTimeOffset(kvp.Key, TimeSpan.Zero), targetPeriod);
+            var slot = PeriodGeometry.ToSlot(new DateTimeOffset(kvp.Key, TimeSpan.Zero), targetPeriod);
             var index = checked((int)(slot - firstSlot));
             result.MutableValueSpan[index] = kvp.Value.Aggregator.Complete(kvp.Value.Count);
             result.MarkPresentAt(index);
@@ -609,22 +600,16 @@ public static class TimeSeriesAggregation
     private static DynamicSlotTimeSeries<TOut> AggregateFixed<TIn, TOut, TAggregator>(
         DynamicSlotTimeSeries<TIn> source,
         Period targetPeriod,
-        long sourceTicks,
-        long targetTicks,
         TAggregator aggregator)
         where TIn : struct, INumber<TIn>
         where TOut : struct, INumber<TOut>
         where TAggregator : struct, IAggregator<TIn, TOut>
     {
-        var factor = checked((int)(targetTicks / sourceTicks));
-        var firstBucket = Math.DivRem(source.StartSlot, factor, out var remStart);
-        if (remStart < 0)
-            firstBucket--;
-
+        var firstTimestamp = PeriodGeometry.FromSlot(source.StartSlot, source.Period);
+        var firstBucket = PeriodGeometry.ToSlot(PeriodGeometry.FloorToBucket(firstTimestamp, targetPeriod), targetPeriod);
         var lastSourceSlot = source.StartSlot + source.SlotLength - 1;
-        var lastBucket = Math.DivRem(lastSourceSlot, factor, out var remEnd);
-        if (remEnd < 0)
-            lastBucket--;
+        var lastTimestamp = PeriodGeometry.FromSlot(lastSourceSlot, source.Period);
+        var lastBucket = PeriodGeometry.ToSlot(PeriodGeometry.FloorToBucket(lastTimestamp, targetPeriod), targetPeriod);
 
         var bucketCount = checked((int)(lastBucket - firstBucket + 1));
         var result = new DynamicSlotTimeSeries<TOut>(targetPeriod, AlignMode.Strict, bucketCount);
@@ -635,8 +620,11 @@ public static class TimeSeriesAggregation
             aggregator.Reset();
             var count = 0;
 
-            var bucketStart = bucket * factor;
-            var bucketEndExclusive = bucketStart + factor;
+            var bucketTimestamp = PeriodGeometry.FromSlot(bucket, targetPeriod);
+            var bucketStart = PeriodGeometry.ToSlot(bucketTimestamp, source.Period);
+            var bucketEndExclusive = PeriodGeometry.ToSlot(
+                PeriodGeometry.AddPeriods(bucketTimestamp, targetPeriod),
+                source.Period);
 
             var localStart = (int)Math.Max(0, bucketStart - source.StartSlot);
             var localEnd = (int)Math.Min(source.SlotLength, bucketEndExclusive - source.StartSlot);
@@ -672,7 +660,7 @@ public static class TimeSeriesAggregation
         var temp = new SortedDictionary<long, (TAggregator Aggregator, int Count)>();
         foreach (var point in source)
         {
-            var bucket = CalendarSlotMath.ToSlot(CalendarSlotMath.AlignToSlot(point.Timestamp, targetPeriod), targetPeriod);
+            var bucket = PeriodGeometry.ToSlot(PeriodGeometry.FloorToBucket(point.Timestamp, targetPeriod), targetPeriod);
             if (!temp.TryGetValue(bucket, out var state))
             {
                 state = (aggregator, 0);

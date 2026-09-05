@@ -10,9 +10,6 @@ public class SortedArrayTimeSeries<T> : ISparseTimeSeries<T>, IEnumerable<TimeSe
     private T[] _values;
     private int _count;
 
-    private readonly Func<DateTimeOffset, DateTimeOffset, bool>? _validationFunc;
-    private DateTimeOffset? _reference;
-
     private const int DefaultCapacity = 16;
 
     public SortedArrayTimeSeries(Period period, int capacity = DefaultCapacity)
@@ -20,9 +17,6 @@ public class SortedArrayTimeSeries<T> : ISparseTimeSeries<T>, IEnumerable<TimeSe
         Period = period;
         _keys = new long[Math.Max(0, capacity)];
         _values = new T[Math.Max(0, capacity)];
-
-        if (period != Period.NonStandard)
-            _validationFunc = (timestamp, reference) => ReferencePeriodValidator.IsAligned(period, timestamp, reference);
     }
 
     public Period Period { get; }
@@ -47,6 +41,7 @@ public class SortedArrayTimeSeries<T> : ISparseTimeSeries<T>, IEnumerable<TimeSe
     {
         get
         {
+            ValidateTimestamp(timestamp);
             var ticks = timestamp.UtcTicks;
             var index = Array.BinarySearch(_keys, 0, _count, ticks);
             if (index < 0)
@@ -59,6 +54,7 @@ public class SortedArrayTimeSeries<T> : ISparseTimeSeries<T>, IEnumerable<TimeSe
 
     public bool TryGetValue(DateTimeOffset timestamp, out T value)
     {
+        ValidateTimestamp(timestamp);
         var index = Array.BinarySearch(_keys, 0, _count, timestamp.UtcTicks);
         if (index >= 0)
         {
@@ -72,7 +68,7 @@ public class SortedArrayTimeSeries<T> : ISparseTimeSeries<T>, IEnumerable<TimeSe
 
     public void Set(DateTimeOffset timestamp, T value)
     {
-        ValidatePeriod(timestamp);
+        ValidateTimestamp(timestamp);
         var ticks = timestamp.UtcTicks;
         var index = Array.BinarySearch(_keys, 0, _count, ticks);
         if (index >= 0)
@@ -89,6 +85,7 @@ public class SortedArrayTimeSeries<T> : ISparseTimeSeries<T>, IEnumerable<TimeSe
 
     public bool Remove(DateTimeOffset timestamp)
     {
+        ValidateTimestamp(timestamp);
         var index = Array.BinarySearch(_keys, 0, _count, timestamp.UtcTicks);
         if (index < 0)
             return false;
@@ -107,7 +104,6 @@ public class SortedArrayTimeSeries<T> : ISparseTimeSeries<T>, IEnumerable<TimeSe
     public void Clear()
     {
         _count = 0;
-        _reference = null;
     }
 
     public IEnumerable<TimeSeriesPoint<T>> GetPoints()
@@ -135,16 +131,9 @@ public class SortedArrayTimeSeries<T> : ISparseTimeSeries<T>, IEnumerable<TimeSe
         return ts;
     }
 
-    private void ValidatePeriod(DateTimeOffset dateTime)
+    private void ValidateTimestamp(DateTimeOffset timestamp)
     {
-        if (_validationFunc is null)
-            return;
-
-        _reference ??= dateTime;
-        if (!_validationFunc(dateTime, _reference.Value))
-            throw new ArgumentException($"The Argument {nameof(dateTime)} value: {dateTime} " +
-                                        $"is not fitting to the reference value {_reference} " +
-                                        $"and the {nameof(Period)} value {Period}");
+        PeriodGeometry.ValidateAligned(timestamp, Period, nameof(timestamp));
     }
 
     private void InsertAt(int index, long ticks, T value)
