@@ -10,12 +10,18 @@ public sealed class DynamicSlotTimeSeries<T> : ISparseTimeSeries<T>, IEnumerable
 
     public DynamicSlotTimeSeries(Period period, AlignMode alignMode = AlignMode.Strict, int capacity = 0)
     {
-        if (period == Period.NonStandard)
-            throw new NotSupportedException($"Period {period} is not supported.");
-
+        ValidatePeriod(period);
         Period = period;
         AlignMode = alignMode;
         _window = new SlotWindow<T>(capacity);
+    }
+
+    internal DynamicSlotTimeSeries(Period period, AlignMode alignMode, SlotWindow<T> window)
+    {
+        ValidatePeriod(period);
+        Period = period;
+        AlignMode = alignMode;
+        _window = window;
     }
 
     public Period Period { get; }
@@ -98,26 +104,42 @@ public sealed class DynamicSlotTimeSeries<T> : ISparseTimeSeries<T>, IEnumerable
 
     IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
 
-    internal long StartSlot => _window.StartSlot;
+    internal DynamicSlotTimeSeries<TOut> AggregateSlots<TOut, TAggregator>(
+        Period targetPeriod,
+        int factor,
+        TAggregator aggregator)
+        where TOut : struct, INumber<TOut>
+        where TAggregator : struct, IAggregator<T, TOut>
+        => new(targetPeriod, AlignMode.Strict, _window.Aggregate<TOut, TAggregator>(factor, aggregator));
 
-    internal int SlotLength => _window.Length;
+    internal DynamicSlotTimeSeries<T> AddSlots(
+        DynamicSlotTimeSeries<T> other,
+        MissingValuePolicy policy)
+        => new(Period, AlignMode.Strict, _window.Add(other._window, policy));
 
-    internal bool IsDense => _window.IsDense;
+    internal DynamicSlotTimeSeries<T> CombineSlots(
+        DynamicSlotTimeSeries<T> other,
+        MissingValuePolicy policy,
+        Func<T, T, T> operation)
+        => new(Period, AlignMode.Strict, _window.Combine(other._window, policy, operation));
 
-    internal ReadOnlySpan<T> ValueSpan => _window.ValueSpan;
+    internal DynamicSlotTimeSeries<T> AddScalar(T scalar) =>
+        new(Period, AlignMode.Strict, _window.Add(scalar));
 
-    internal Span<T> MutableValueSpan => _window.MutableValueSpan;
+    internal DynamicSlotTimeSeries<T> MultiplyScalar(T scalar) =>
+        new(Period, AlignMode.Strict, _window.Multiply(scalar));
 
-    internal ReadOnlySpan<ulong> PresenceBits => _window.PresenceBits;
-
-    internal bool TryGetSlotValue(long slot, out T value) => _window.TryGetValue(slot, out value);
-
-    internal void InitializeWindow(long startSlot, int length) => _window.InitializeWindow(startSlot, length);
-
-    internal void MarkPresentAt(int index) => _window.MarkPresentAt(index);
+    internal DynamicSlotTimeSeries<T> DivideScalar(T scalar) =>
+        new(Period, AlignMode.Strict, _window.Divide(scalar));
 
     private DateTimeOffset Normalize(DateTimeOffset timestamp) =>
         AlignMode == AlignMode.Truncate
             ? PeriodGeometry.FloorToBucket(timestamp, Period)
             : timestamp;
+
+    private static void ValidatePeriod(Period period)
+    {
+        if (period == Period.NonStandard)
+            throw new NotSupportedException($"Period {period} is not supported.");
+    }
 }

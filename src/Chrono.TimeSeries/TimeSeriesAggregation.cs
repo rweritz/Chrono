@@ -156,7 +156,8 @@ public static class TimeSeriesAggregation
             targetTicks >= sourceTicks &&
             targetTicks % sourceTicks == 0)
         {
-            return AggregateFixed<TIn, TOut, TAggregator>(source, targetPeriod, aggregator);
+            var factor = checked((int)(targetTicks / sourceTicks));
+            return source.AggregateSlots<TOut, TAggregator>(targetPeriod, factor, aggregator);
         }
 
         return AggregateCalendar<TIn, TOut, TAggregator>(source, targetPeriod, aggregator);
@@ -280,7 +281,8 @@ public static class TimeSeriesAggregation
             targetTicks >= sourceTicks &&
             targetTicks % sourceTicks == 0)
         {
-            return AggregateFixed<TIn, TOut, TAggregator>(source, targetPeriod, aggregator);
+            var factor = checked((int)(targetTicks / sourceTicks));
+            return source.AggregateSlots<TOut, TAggregator>(targetPeriod, factor, aggregator);
         }
 
         return AggregateCalendar<TIn, TOut, TAggregator>(source, targetPeriod, aggregator);
@@ -490,33 +492,6 @@ public static class TimeSeriesAggregation
         return result;
     }
 
-    private static FixedSlotTimeSeries<TOut> AggregateFixed<TIn, TOut, TAggregator>(
-        FixedSlotTimeSeries<TIn> source,
-        Period targetPeriod,
-        TAggregator aggregator)
-        where TIn : struct, INumber<TIn>
-        where TOut : struct, INumber<TOut>
-        where TAggregator : struct, IAggregator<TIn, TOut>
-    {
-        var aggregation = AggregateFixedWindow<TIn, TOut, TAggregator>(
-            source.StartSlot,
-            source.SlotLength,
-            source.Period,
-            targetPeriod,
-            source.TryGetSlotValue,
-            aggregator);
-        var result = new FixedSlotTimeSeries<TOut>(targetPeriod, aggregation.Values.Length);
-        result.InitializeWindow(aggregation.FirstBucket, aggregation.Values.Length);
-        aggregation.Values.CopyTo(result.MutableValueSpan);
-        for (var i = 0; i < aggregation.Present.Length; i++)
-        {
-            if (aggregation.Present[i])
-                result.MarkPresentAt(i);
-        }
-
-        return result;
-    }
-
     private static FixedSlotTimeSeries<TOut> AggregateCalendar<TIn, TOut, TAggregator>(
         FixedSlotTimeSeries<TIn> source,
         Period targetPeriod,
@@ -540,108 +515,18 @@ public static class TimeSeriesAggregation
             temp[bucket] = state;
         }
 
-        var result = new FixedSlotTimeSeries<TOut>(targetPeriod, temp.Count);
         if (temp.Count == 0)
-            return result;
+            return new FixedSlotTimeSeries<TOut>(targetPeriod);
 
-        var firstBucketTick = temp.First().Key;
-        var firstSlot = PeriodGeometry.ToSlot(new DateTimeOffset(firstBucketTick, TimeSpan.Zero), targetPeriod);
-        var lastBucketTick = temp.Last().Key;
-        var lastSlot = PeriodGeometry.ToSlot(new DateTimeOffset(lastBucketTick, TimeSpan.Zero), targetPeriod);
-        var len = checked((int)(lastSlot - firstSlot + 1));
-        result.InitializeWindow(firstSlot, len);
+        var resultWindow = new SlotWindow<TOut>(temp.Count);
 
         foreach (var kvp in temp)
         {
             var slot = PeriodGeometry.ToSlot(new DateTimeOffset(kvp.Key, TimeSpan.Zero), targetPeriod);
-            var index = checked((int)(slot - firstSlot));
-            result.MutableValueSpan[index] = kvp.Value.Aggregator.Complete(kvp.Value.Count);
-            result.MarkPresentAt(index);
+            resultWindow.Set(slot, kvp.Value.Aggregator.Complete(kvp.Value.Count));
         }
 
-        return result;
-    }
-
-    private static DynamicSlotTimeSeries<TOut> AggregateFixed<TIn, TOut, TAggregator>(
-        DynamicSlotTimeSeries<TIn> source,
-        Period targetPeriod,
-        TAggregator aggregator)
-        where TIn : struct, INumber<TIn>
-        where TOut : struct, INumber<TOut>
-        where TAggregator : struct, IAggregator<TIn, TOut>
-    {
-        var aggregation = AggregateFixedWindow<TIn, TOut, TAggregator>(
-            source.StartSlot,
-            source.SlotLength,
-            source.Period,
-            targetPeriod,
-            source.TryGetSlotValue,
-            aggregator);
-        var result = new DynamicSlotTimeSeries<TOut>(targetPeriod, AlignMode.Strict, aggregation.Values.Length);
-        result.InitializeWindow(aggregation.FirstBucket, aggregation.Values.Length);
-        aggregation.Values.CopyTo(result.MutableValueSpan);
-        for (var i = 0; i < aggregation.Present.Length; i++)
-        {
-            if (aggregation.Present[i])
-                result.MarkPresentAt(i);
-        }
-
-        return result;
-    }
-
-    private static FixedAggregation<TOut> AggregateFixedWindow<TIn, TOut, TAggregator>(
-        long sourceStartSlot,
-        int sourceSlotLength,
-        Period sourcePeriod,
-        Period targetPeriod,
-        TryGetSlotValue<TIn> tryGetSlotValue,
-        TAggregator aggregator)
-        where TIn : struct, INumber<TIn>
-        where TOut : struct, INumber<TOut>
-        where TAggregator : struct, IAggregator<TIn, TOut>
-    {
-        var firstTimestamp = PeriodGeometry.FromSlot(sourceStartSlot, sourcePeriod);
-        var firstBucket = PeriodGeometry.ToSlot(PeriodGeometry.FloorToBucket(firstTimestamp, targetPeriod), targetPeriod);
-        var lastSourceSlot = sourceStartSlot + sourceSlotLength - 1;
-        var lastTimestamp = PeriodGeometry.FromSlot(lastSourceSlot, sourcePeriod);
-        var lastBucket = PeriodGeometry.ToSlot(PeriodGeometry.FloorToBucket(lastTimestamp, targetPeriod), targetPeriod);
-
-        var bucketCount = checked((int)(lastBucket - firstBucket + 1));
-        var values = new TOut[bucketCount];
-        var present = new bool[bucketCount];
-
-        for (var bucket = firstBucket; bucket <= lastBucket; bucket++)
-        {
-            aggregator.Reset();
-            var count = 0;
-
-            var bucketTimestamp = PeriodGeometry.FromSlot(bucket, targetPeriod);
-            var bucketStart = PeriodGeometry.ToSlot(bucketTimestamp, sourcePeriod);
-            var bucketEndExclusive = PeriodGeometry.ToSlot(
-                PeriodGeometry.AddPeriods(bucketTimestamp, targetPeriod),
-                sourcePeriod);
-
-            var localStart = (int)Math.Max(0, bucketStart - sourceStartSlot);
-            var localEnd = (int)Math.Min(sourceSlotLength, bucketEndExclusive - sourceStartSlot);
-
-            for (var i = localStart; i < localEnd; i++)
-            {
-                if (!tryGetSlotValue(sourceStartSlot + i, out var value))
-                    continue;
-
-                aggregator.Add(value);
-                count++;
-            }
-
-            if (count == 0)
-                continue;
-
-            var index = checked((int)(bucket - firstBucket));
-            values[index] = aggregator.Complete(count);
-            present[index] = true;
-        }
-
-        return new FixedAggregation<TOut>(firstBucket, values, present);
+        return new FixedSlotTimeSeries<TOut>(targetPeriod, resultWindow);
     }
 
     private static DynamicSlotTimeSeries<TOut> AggregateCalendar<TIn, TOut, TAggregator>(
@@ -667,27 +552,15 @@ public static class TimeSeriesAggregation
             temp[bucket] = state;
         }
 
-        var result = new DynamicSlotTimeSeries<TOut>(targetPeriod, AlignMode.Strict, temp.Count);
         if (temp.Count == 0)
-            return result;
+            return new DynamicSlotTimeSeries<TOut>(targetPeriod);
 
-        var firstSlot = temp.First().Key;
-        var lastSlot = temp.Last().Key;
-        var len = checked((int)(lastSlot - firstSlot + 1));
-        result.InitializeWindow(firstSlot, len);
+        var resultWindow = new SlotWindow<TOut>(temp.Count);
 
         foreach (var kvp in temp)
-        {
-            var index = checked((int)(kvp.Key - firstSlot));
-            result.MutableValueSpan[index] = kvp.Value.Aggregator.Complete(kvp.Value.Count);
-            result.MarkPresentAt(index);
-        }
+            resultWindow.Set(kvp.Key, kvp.Value.Aggregator.Complete(kvp.Value.Count));
 
-        return result;
+        return new DynamicSlotTimeSeries<TOut>(targetPeriod, AlignMode.Strict, resultWindow);
     }
 
-    private delegate bool TryGetSlotValue<T>(long slot, out T value) where T : struct;
-
-    private readonly record struct FixedAggregation<T>(long FirstBucket, T[] Values, bool[] Present)
-        where T : struct;
 }

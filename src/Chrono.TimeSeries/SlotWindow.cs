@@ -28,12 +28,6 @@ internal sealed class SlotWindow<T>
 
     public bool IsDense => _count == _length;
 
-    public ReadOnlySpan<T> ValueSpan => _values.AsSpan(0, _length);
-
-    public Span<T> MutableValueSpan => _values.AsSpan(0, _length);
-
-    public ReadOnlySpan<ulong> PresenceBits => _presentBits;
-
     public void Set(long slot, T value)
     {
         var index = EnsureSlot(slot);
@@ -116,23 +110,152 @@ internal sealed class SlotWindow<T>
         throw new InvalidOperationException("Series is empty.");
     }
 
-    public void InitializeWindow(long startSlot, int length)
+    public SlotWindow<TOut> Aggregate<TOut, TAggregator>(int factor, TAggregator aggregator)
+        where TOut : struct, INumber<TOut>
+        where TAggregator : struct, IAggregator<T, TOut>
     {
-        EnsureCapacity(length);
-        _startSlot = startSlot;
-        _length = length;
-        _count = 0;
-        Array.Clear(_values, 0, _length);
-        Array.Clear(_presentBits, 0, _presentBits.Length);
+        if (factor <= 0)
+            throw new ArgumentOutOfRangeException(nameof(factor));
+
+        if (_length == 0)
+            return new SlotWindow<TOut>();
+
+        var firstBucket = Math.DivRem(_startSlot, factor, out var firstRemainder);
+        if (firstRemainder < 0)
+            firstBucket--;
+
+        var lastSourceSlot = _startSlot + _length - 1;
+        var lastBucket = Math.DivRem(lastSourceSlot, factor, out var lastRemainder);
+        if (lastRemainder < 0)
+            lastBucket--;
+
+        var bucketCount = checked((int)(lastBucket - firstBucket + 1));
+        var result = new SlotWindow<TOut>(bucketCount);
+
+        for (var bucket = firstBucket; bucket <= lastBucket; bucket++)
+        {
+            aggregator.Reset();
+            var count = 0;
+            var bucketStart = bucket * factor;
+            var bucketEndExclusive = bucketStart + factor;
+            var localStart = (int)Math.Max(0, bucketStart - _startSlot);
+            var localEnd = (int)Math.Min(_length, bucketEndExclusive - _startSlot);
+
+            for (var i = localStart; i < localEnd; i++)
+            {
+                if (!IsPresent(i))
+                    continue;
+
+                aggregator.Add(_values[i]);
+                count++;
+            }
+
+            if (count > 0)
+                result.Set(bucket, aggregator.Complete(count));
+        }
+
+        return result;
     }
 
-    public void MarkPresentAt(int index)
+    public SlotWindow<T> Add(SlotWindow<T> other, MissingValuePolicy policy)
     {
-        if (!IsPresent(index))
+        if (policy == MissingValuePolicy.Intersection &&
+            IsDense && other.IsDense &&
+            _startSlot == other._startSlot &&
+            _length == other._length)
         {
-            MarkPresent(index);
-            _count++;
+            var result = CreateInitialized(_startSlot, _length);
+            NumericSpanOperations<T>.Add(
+                _values.AsSpan(0, _length),
+                other._values.AsSpan(0, _length),
+                result._values.AsSpan(0, _length));
+            result.MarkAllPresent();
+            return result;
         }
+
+        return Combine(other, policy, static (left, right) => left + right);
+    }
+
+    public SlotWindow<T> Combine(
+        SlotWindow<T> other,
+        MissingValuePolicy policy,
+        Func<T, T, T> operation)
+    {
+        var start = policy == MissingValuePolicy.Intersection
+            ? Math.Max(_startSlot, other._startSlot)
+            : Math.Min(_startSlot, other._startSlot);
+
+        var endExclusive = policy == MissingValuePolicy.Intersection
+            ? Math.Min(_startSlot + _length, other._startSlot + other._length)
+            : Math.Max(_startSlot + _length, other._startSlot + other._length);
+
+        if (endExclusive <= start)
+            return new SlotWindow<T>();
+
+        var result = CreateInitialized(start, checked((int)(endExclusive - start)));
+
+        for (var slot = start; slot < endExclusive; slot++)
+        {
+            var hasLeft = TryGetValue(slot, out var left);
+            var hasRight = other.TryGetValue(slot, out var right);
+
+            switch (policy)
+            {
+                case MissingValuePolicy.Throw when hasLeft != hasRight:
+                    throw new InvalidOperationException($"Missing value at slot {slot}.");
+                case MissingValuePolicy.Intersection when !(hasLeft && hasRight):
+                    continue;
+                case MissingValuePolicy.UnionWithZero when !(hasLeft || hasRight):
+                    continue;
+            }
+
+            result.Set(slot, operation(hasLeft ? left : T.Zero, hasRight ? right : T.Zero));
+        }
+
+        return result;
+    }
+
+    public SlotWindow<T> Add(T scalar) =>
+        Transform(scalar, NumericSpanOperations<T>.AddScalar);
+
+    public SlotWindow<T> Multiply(T scalar) =>
+        Transform(scalar, NumericSpanOperations<T>.Multiply);
+
+    public SlotWindow<T> Divide(T scalar) =>
+        Transform(scalar, NumericSpanOperations<T>.Divide);
+
+    private delegate void DenseTransform(ReadOnlySpan<T> input, T operand, Span<T> destination);
+
+    private SlotWindow<T> Transform(T operand, DenseTransform transform)
+    {
+        if (_length == 0)
+            return new SlotWindow<T>();
+
+        var result = CreateInitialized(_startSlot, _length);
+        transform(_values.AsSpan(0, _length), operand, result._values.AsSpan(0, _length));
+        Array.Copy(_presentBits, result._presentBits, (_length + 63) >> 6);
+        result._count = _count;
+        return result;
+    }
+
+    private static SlotWindow<T> CreateInitialized(long startSlot, int length)
+    {
+        var result = new SlotWindow<T>(length)
+        {
+            _startSlot = startSlot,
+            _length = length
+        };
+
+        return result;
+    }
+
+    private void MarkAllPresent()
+    {
+        Array.Fill(_presentBits, ulong.MaxValue);
+        if ((_length & 63) != 0)
+            _presentBits[^1] = (1UL << (_length & 63)) - 1;
+
+        _count = _length;
     }
 
     private int EnsureSlot(long slot)

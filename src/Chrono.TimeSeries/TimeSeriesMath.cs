@@ -1,5 +1,4 @@
 using System.Numerics;
-using System.Runtime.InteropServices;
 
 namespace Chrono.TimeSeries;
 
@@ -300,21 +299,7 @@ public static class TimeSeriesMath
         where T : struct, INumber<T>
     {
         EnsureCompatible(left, right);
-
-        if (policy == MissingValuePolicy.Intersection &&
-            left.IsDense && right.IsDense &&
-            left.StartSlot == right.StartSlot &&
-            left.SlotLength == right.SlotLength)
-        {
-            var result = new FixedSlotTimeSeries<T>(left.Period, left.SlotLength);
-            result.InitializeWindow(left.StartSlot, left.SlotLength);
-            AddDense(left.ValueSpan, right.ValueSpan, result.MutableValueSpan);
-            for (var i = 0; i < left.SlotLength; i++)
-                result.MarkPresentAt(i);
-            return result;
-        }
-
-        return MergeRegular(left, right, policy, static (a, b) => a + b);
+        return left.AddSlots(right, policy);
     }
 
     public static IReadOnlySparseTimeSeries<T> Add<T>(
@@ -589,45 +574,15 @@ public static class TimeSeriesMath
 
     public static FixedSlotTimeSeries<T> Multiply<T>(FixedSlotTimeSeries<T> input, T scalar)
         where T : struct, INumber<T>
-    {
-        var result = new FixedSlotTimeSeries<T>(input.Period, input.SlotLength);
-        result.InitializeWindow(input.StartSlot, input.SlotLength);
-        MultiplyDense(input.ValueSpan, scalar, result.MutableValueSpan);
-
-        for (var i = 0; i < input.SlotLength; i++)
-            if (input.TryGetSlotValue(input.StartSlot + i, out _))
-                result.MarkPresentAt(i);
-
-        return result;
-    }
+        => input.MultiplyScalar(scalar);
 
     public static FixedSlotTimeSeries<T> Add<T>(FixedSlotTimeSeries<T> input, T scalar)
         where T : struct, INumber<T>
-    {
-        var result = new FixedSlotTimeSeries<T>(input.Period, input.SlotLength);
-        result.InitializeWindow(input.StartSlot, input.SlotLength);
-        AddScalarDense(input.ValueSpan, scalar, result.MutableValueSpan);
-
-        for (var i = 0; i < input.SlotLength; i++)
-            if (input.TryGetSlotValue(input.StartSlot + i, out _))
-                result.MarkPresentAt(i);
-
-        return result;
-    }
+        => input.AddScalar(scalar);
 
     public static FixedSlotTimeSeries<T> Divide<T>(FixedSlotTimeSeries<T> input, T scalar)
         where T : struct, INumber<T>
-    {
-        var result = new FixedSlotTimeSeries<T>(input.Period, input.SlotLength);
-        result.InitializeWindow(input.StartSlot, input.SlotLength);
-        DivideDense(input.ValueSpan, scalar, result.MutableValueSpan);
-
-        for (var i = 0; i < input.SlotLength; i++)
-            if (input.TryGetSlotValue(input.StartSlot + i, out _))
-                result.MarkPresentAt(i);
-
-        return result;
-    }
+        => input.DivideScalar(scalar);
 
     public static DynamicSlotTimeSeries<T> Add<T>(
         DynamicSlotTimeSeries<T> left,
@@ -636,21 +591,7 @@ public static class TimeSeriesMath
         where T : struct, INumber<T>
     {
         EnsureCompatible(left, right);
-
-        if (policy == MissingValuePolicy.Intersection &&
-            left.IsDense && right.IsDense &&
-            left.StartSlot == right.StartSlot &&
-            left.SlotLength == right.SlotLength)
-        {
-            var result = new DynamicSlotTimeSeries<T>(left.Period, AlignMode.Strict, left.SlotLength);
-            result.InitializeWindow(left.StartSlot, left.SlotLength);
-            AddDense(left.ValueSpan, right.ValueSpan, result.MutableValueSpan);
-            for (var i = 0; i < left.SlotLength; i++)
-                result.MarkPresentAt(i);
-            return result;
-        }
-
-        return MergeCalendar(left, right, policy, static (a, b) => a + b);
+        return left.AddSlots(right, policy);
     }
 
     public static DynamicSlotTimeSeries<T> Subtract<T>(
@@ -685,45 +626,15 @@ public static class TimeSeriesMath
 
     public static DynamicSlotTimeSeries<T> Multiply<T>(DynamicSlotTimeSeries<T> input, T scalar)
         where T : struct, INumber<T>
-    {
-        var result = new DynamicSlotTimeSeries<T>(input.Period, AlignMode.Strict, input.SlotLength);
-        result.InitializeWindow(input.StartSlot, input.SlotLength);
-        MultiplyDense(input.ValueSpan, scalar, result.MutableValueSpan);
-
-        for (var i = 0; i < input.SlotLength; i++)
-            if (input.TryGetSlotValue(input.StartSlot + i, out _))
-                result.MarkPresentAt(i);
-
-        return result;
-    }
+        => input.MultiplyScalar(scalar);
 
     public static DynamicSlotTimeSeries<T> Add<T>(DynamicSlotTimeSeries<T> input, T scalar)
         where T : struct, INumber<T>
-    {
-        var result = new DynamicSlotTimeSeries<T>(input.Period, AlignMode.Strict, input.SlotLength);
-        result.InitializeWindow(input.StartSlot, input.SlotLength);
-        AddScalarDense(input.ValueSpan, scalar, result.MutableValueSpan);
-
-        for (var i = 0; i < input.SlotLength; i++)
-            if (input.TryGetSlotValue(input.StartSlot + i, out _))
-                result.MarkPresentAt(i);
-
-        return result;
-    }
+        => input.AddScalar(scalar);
 
     public static DynamicSlotTimeSeries<T> Divide<T>(DynamicSlotTimeSeries<T> input, T scalar)
         where T : struct, INumber<T>
-    {
-        var result = new DynamicSlotTimeSeries<T>(input.Period, AlignMode.Strict, input.SlotLength);
-        result.InitializeWindow(input.StartSlot, input.SlotLength);
-        DivideDense(input.ValueSpan, scalar, result.MutableValueSpan);
-
-        for (var i = 0; i < input.SlotLength; i++)
-            if (input.TryGetSlotValue(input.StartSlot + i, out _))
-                result.MarkPresentAt(i);
-
-        return result;
-    }
+        => input.DivideScalar(scalar);
 
     public static SortedArrayTimeSeries<T> Add<T>(
         SortedArrayTimeSeries<T> left,
@@ -773,7 +684,7 @@ public static class TimeSeriesMath
         var outKeys = keys.ToArray();
         var outValues = new T[values.Length];
 
-        MultiplyDense(values, scalar, outValues);
+        NumericSpanOperations<T>.Multiply(values, scalar, outValues);
         return SortedArrayTimeSeries<T>.CreateFromSortedRaw(outKeys, outValues, source.Period);
     }
 
@@ -785,7 +696,7 @@ public static class TimeSeriesMath
         var outKeys = keys.ToArray();
         var outValues = new T[values.Length];
 
-        AddScalarDense(values, scalar, outValues);
+        NumericSpanOperations<T>.AddScalar(values, scalar, outValues);
         return SortedArrayTimeSeries<T>.CreateFromSortedRaw(outKeys, outValues, source.Period);
     }
 
@@ -797,7 +708,7 @@ public static class TimeSeriesMath
         var outKeys = keys.ToArray();
         var outValues = new T[values.Length];
 
-        DivideDense(values, scalar, outValues);
+        NumericSpanOperations<T>.Divide(values, scalar, outValues);
         return SortedArrayTimeSeries<T>.CreateFromSortedRaw(outKeys, outValues, source.Period);
     }
 
@@ -807,43 +718,7 @@ public static class TimeSeriesMath
         MissingValuePolicy policy,
         Func<T, T, T> op)
         where T : struct, INumber<T>
-    {
-        var start = policy == MissingValuePolicy.Intersection
-            ? Math.Max(left.StartSlot, right.StartSlot)
-            : Math.Min(left.StartSlot, right.StartSlot);
-
-        var endExclusive = policy == MissingValuePolicy.Intersection
-            ? Math.Min(left.StartSlot + left.SlotLength, right.StartSlot + right.SlotLength)
-            : Math.Max(left.StartSlot + left.SlotLength, right.StartSlot + right.SlotLength);
-
-        if (endExclusive <= start)
-            return new FixedSlotTimeSeries<T>(left.Period);
-
-        var result = new FixedSlotTimeSeries<T>(left.Period, checked((int)(endExclusive - start)));
-        result.InitializeWindow(start, checked((int)(endExclusive - start)));
-
-        for (var slot = start; slot < endExclusive; slot++)
-        {
-            var hasLeft = left.TryGetSlotValue(slot, out var lv);
-            var hasRight = right.TryGetSlotValue(slot, out var rv);
-
-            switch (policy)
-            {
-                case MissingValuePolicy.Throw when hasLeft != hasRight:
-                    throw new InvalidOperationException($"Missing value at slot {slot}.");
-                case MissingValuePolicy.Intersection when !(hasLeft && hasRight):
-                    continue;
-                case MissingValuePolicy.UnionWithZero when !(hasLeft || hasRight):
-                    continue;
-            }
-
-            var index = checked((int)(slot - start));
-            result.MutableValueSpan[index] = op(hasLeft ? lv : T.Zero, hasRight ? rv : T.Zero);
-            result.MarkPresentAt(index);
-        }
-
-        return result;
-    }
+        => left.CombineSlots(right, policy, op);
 
     private static SortedArrayTimeSeries<T> MergeSparse<T>(
         IReadOnlySparseTimeSeries<T> left,
@@ -1223,43 +1098,7 @@ public static class TimeSeriesMath
         MissingValuePolicy policy,
         Func<T, T, T> op)
         where T : struct, INumber<T>
-    {
-        var start = policy == MissingValuePolicy.Intersection
-            ? Math.Max(left.StartSlot, right.StartSlot)
-            : Math.Min(left.StartSlot, right.StartSlot);
-
-        var endExclusive = policy == MissingValuePolicy.Intersection
-            ? Math.Min(left.StartSlot + left.SlotLength, right.StartSlot + right.SlotLength)
-            : Math.Max(left.StartSlot + left.SlotLength, right.StartSlot + right.SlotLength);
-
-        if (endExclusive <= start)
-            return new DynamicSlotTimeSeries<T>(left.Period);
-
-        var result = new DynamicSlotTimeSeries<T>(left.Period, AlignMode.Strict, checked((int)(endExclusive - start)));
-        result.InitializeWindow(start, checked((int)(endExclusive - start)));
-
-        for (var slot = start; slot < endExclusive; slot++)
-        {
-            var hasLeft = left.TryGetSlotValue(slot, out var lv);
-            var hasRight = right.TryGetSlotValue(slot, out var rv);
-
-            switch (policy)
-            {
-                case MissingValuePolicy.Throw when hasLeft != hasRight:
-                    throw new InvalidOperationException($"Missing value at slot {slot}.");
-                case MissingValuePolicy.Intersection when !(hasLeft && hasRight):
-                    continue;
-                case MissingValuePolicy.UnionWithZero when !(hasLeft || hasRight):
-                    continue;
-            }
-
-            var index = checked((int)(slot - start));
-            result.MutableValueSpan[index] = op(hasLeft ? lv : T.Zero, hasRight ? rv : T.Zero);
-            result.MarkPresentAt(index);
-        }
-
-        return result;
-    }
+        => left.CombineSlots(right, policy, op);
 
     private static bool TryBinaryAsSparseTarget<T, TResult>(
         IReadOnlyTimeSeries<T> left,
@@ -1364,21 +1203,21 @@ public static class TimeSeriesMath
     internal static DynamicSlotTimeSeries<T> ToDynamicSlotTimeSeries<T>(IReadOnlySparseTimeSeries<T> source)
         where T : struct, INumber<T>
     {
-        var result = new DynamicSlotTimeSeries<T>(source.Period, AlignMode.Strict, source.ExplicitPointCount);
+        var window = new SlotWindow<T>(source.ExplicitPointCount);
         foreach (var point in source.GetPoints())
-            result[point.Timestamp] = point.Value;
+            window.Set(PeriodGeometry.ToSlot(point.Timestamp, source.Period), point.Value);
 
-        return result;
+        return new DynamicSlotTimeSeries<T>(source.Period, AlignMode.Strict, window);
     }
 
     internal static FixedSlotTimeSeries<T> ToFixedSlotTimeSeries<T>(IReadOnlySparseTimeSeries<T> source)
         where T : struct, INumber<T>
     {
-        var result = new FixedSlotTimeSeries<T>(source.Period, source.ExplicitPointCount);
+        var window = new SlotWindow<T>(source.ExplicitPointCount);
         foreach (var point in source.GetPoints())
-            result[point.Timestamp] = point.Value;
+            window.Set(PeriodGeometry.ToSlot(point.Timestamp, source.Period), point.Value);
 
-        return result;
+        return new FixedSlotTimeSeries<T>(source.Period, window);
     }
 
     private static TimeSeriesSemanticFamily ClassifySemanticFamily<T>(IReadOnlyTimeSeries<T> source)
@@ -1411,142 +1250,6 @@ public static class TimeSeriesMath
     {
         if (left.Period != right.Period)
             throw new InvalidOperationException("Periods must match.");
-    }
-
-    private static void AddDense<T>(ReadOnlySpan<T> left, ReadOnlySpan<T> right, Span<T> destination)
-        where T : struct, INumber<T>
-    {
-        if (typeof(T) == typeof(double))
-        {
-            AddDouble(
-                MemoryMarshal.Cast<T, double>(left),
-                MemoryMarshal.Cast<T, double>(right),
-                MemoryMarshal.Cast<T, double>(destination));
-            return;
-        }
-
-        if (typeof(T) == typeof(int))
-        {
-            AddInt32(
-                MemoryMarshal.Cast<T, int>(left),
-                MemoryMarshal.Cast<T, int>(right),
-                MemoryMarshal.Cast<T, int>(destination));
-            return;
-        }
-
-        for (var i = 0; i < left.Length; i++)
-            destination[i] = left[i] + right[i];
-    }
-
-    private static void AddScalarDense<T>(ReadOnlySpan<T> input, T scalar, Span<T> destination)
-        where T : struct, INumber<T>
-    {
-        for (var i = 0; i < input.Length; i++)
-            destination[i] = input[i] + scalar;
-    }
-
-    private static void MultiplyDense<T>(ReadOnlySpan<T> input, T scalar, Span<T> destination)
-        where T : struct, INumber<T>
-    {
-        if (typeof(T) == typeof(double))
-        {
-            MultiplyDouble(
-                MemoryMarshal.Cast<T, double>(input),
-                double.CreateChecked(scalar),
-                MemoryMarshal.Cast<T, double>(destination));
-            return;
-        }
-
-        if (typeof(T) == typeof(int))
-        {
-            MultiplyInt32(
-                MemoryMarshal.Cast<T, int>(input),
-                int.CreateChecked(scalar),
-                MemoryMarshal.Cast<T, int>(destination));
-            return;
-        }
-
-        for (var i = 0; i < input.Length; i++)
-            destination[i] = input[i] * scalar;
-    }
-
-    private static void DivideDense<T>(ReadOnlySpan<T> input, T scalar, Span<T> destination)
-        where T : struct, INumber<T>
-    {
-        for (var i = 0; i < input.Length; i++)
-            destination[i] = input[i] / scalar;
-    }
-
-    private static void AddDouble(ReadOnlySpan<double> left, ReadOnlySpan<double> right, Span<double> destination)
-    {
-        var i = 0;
-        if (Vector.IsHardwareAccelerated)
-        {
-            var width = Vector<double>.Count;
-            for (; i <= left.Length - width; i += width)
-            {
-                (new Vector<double>(left.Slice(i, width)) +
-                 new Vector<double>(right.Slice(i, width)))
-                    .CopyTo(destination.Slice(i, width));
-            }
-        }
-
-        for (; i < left.Length; i++)
-            destination[i] = left[i] + right[i];
-    }
-
-    private static void MultiplyDouble(ReadOnlySpan<double> input, double scalar, Span<double> destination)
-    {
-        var i = 0;
-        if (Vector.IsHardwareAccelerated)
-        {
-            var width = Vector<double>.Count;
-            var sv = new Vector<double>(scalar);
-            for (; i <= input.Length - width; i += width)
-            {
-                (new Vector<double>(input.Slice(i, width)) * sv)
-                    .CopyTo(destination.Slice(i, width));
-            }
-        }
-
-        for (; i < input.Length; i++)
-            destination[i] = input[i] * scalar;
-    }
-
-    private static void AddInt32(ReadOnlySpan<int> left, ReadOnlySpan<int> right, Span<int> destination)
-    {
-        var i = 0;
-        if (Vector.IsHardwareAccelerated)
-        {
-            var width = Vector<int>.Count;
-            for (; i <= left.Length - width; i += width)
-            {
-                (new Vector<int>(left.Slice(i, width)) +
-                 new Vector<int>(right.Slice(i, width)))
-                    .CopyTo(destination.Slice(i, width));
-            }
-        }
-
-        for (; i < left.Length; i++)
-            destination[i] = left[i] + right[i];
-    }
-
-    private static void MultiplyInt32(ReadOnlySpan<int> input, int scalar, Span<int> destination)
-    {
-        var i = 0;
-        if (Vector.IsHardwareAccelerated)
-        {
-            var width = Vector<int>.Count;
-            var sv = new Vector<int>(scalar);
-            for (; i <= input.Length - width; i += width)
-            {
-                (new Vector<int>(input.Slice(i, width)) * sv)
-                    .CopyTo(destination.Slice(i, width));
-            }
-        }
-
-        for (; i < input.Length; i++)
-            destination[i] = input[i] * scalar;
     }
 
     private static void EnsureCompatible<T>(FixedSlotTimeSeries<T> left, FixedSlotTimeSeries<T> right)

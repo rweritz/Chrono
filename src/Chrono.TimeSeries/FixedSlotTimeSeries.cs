@@ -10,11 +10,16 @@ public sealed class FixedSlotTimeSeries<T> : ISparseTimeSeries<T>, IEnumerable<T
 
     public FixedSlotTimeSeries(Period period, int capacity = 0)
     {
-        if (!PeriodGeometry.TryGetFixedTicks(period, out _))
-            throw new NotSupportedException($"Use SortedArrayTimeSeries for period {period}.");
-
+        ValidatePeriod(period);
         Period = period;
         _window = new SlotWindow<T>(capacity);
+    }
+
+    internal FixedSlotTimeSeries(Period period, SlotWindow<T> window)
+    {
+        ValidatePeriod(period);
+        Period = period;
+        _window = window;
     }
 
     public Period Period { get; }
@@ -85,21 +90,37 @@ public sealed class FixedSlotTimeSeries<T> : ISparseTimeSeries<T>, IEnumerable<T
 
     IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
 
-    internal long StartSlot => _window.StartSlot;
+    internal FixedSlotTimeSeries<TOut> AggregateSlots<TOut, TAggregator>(
+        Period targetPeriod,
+        int factor,
+        TAggregator aggregator)
+        where TOut : struct, INumber<TOut>
+        where TAggregator : struct, IAggregator<T, TOut>
+        => new(targetPeriod, _window.Aggregate<TOut, TAggregator>(factor, aggregator));
 
-    internal int SlotLength => _window.Length;
+    internal FixedSlotTimeSeries<T> AddSlots(
+        FixedSlotTimeSeries<T> other,
+        MissingValuePolicy policy)
+        => new(Period, _window.Add(other._window, policy));
 
-    internal bool IsDense => _window.IsDense;
+    internal FixedSlotTimeSeries<T> CombineSlots(
+        FixedSlotTimeSeries<T> other,
+        MissingValuePolicy policy,
+        Func<T, T, T> operation)
+        => new(Period, _window.Combine(other._window, policy, operation));
 
-    internal ReadOnlySpan<T> ValueSpan => _window.ValueSpan;
+    internal FixedSlotTimeSeries<T> AddScalar(T scalar) =>
+        new(Period, _window.Add(scalar));
 
-    internal Span<T> MutableValueSpan => _window.MutableValueSpan;
+    internal FixedSlotTimeSeries<T> MultiplyScalar(T scalar) =>
+        new(Period, _window.Multiply(scalar));
 
-    internal ReadOnlySpan<ulong> PresenceBits => _window.PresenceBits;
+    internal FixedSlotTimeSeries<T> DivideScalar(T scalar) =>
+        new(Period, _window.Divide(scalar));
 
-    internal bool TryGetSlotValue(long slot, out T value) => _window.TryGetValue(slot, out value);
-
-    internal void InitializeWindow(long startSlot, int length) => _window.InitializeWindow(startSlot, length);
-
-    internal void MarkPresentAt(int index) => _window.MarkPresentAt(index);
+    private static void ValidatePeriod(Period period)
+    {
+        if (!PeriodGeometry.TryGetFixedTicks(period, out _))
+            throw new NotSupportedException($"Use SortedArrayTimeSeries for period {period}.");
+    }
 }

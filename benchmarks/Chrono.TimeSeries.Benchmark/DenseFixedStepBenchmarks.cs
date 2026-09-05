@@ -85,7 +85,9 @@ public class DenseFixedStepBenchmarks
     [Benchmark]
     public double RandomLookup() => SumLookups(ActiveSeriesA(), _data.RandomLookupTimestamps);
 
+    // The FixedSlot cases exercise SlotWindow's optimized dense result construction.
     [Benchmark]
+    [BenchmarkCategory("SlotWindowResultConstruction")]
     public object ScalarAdd() =>
         Implementation switch
         {
@@ -96,6 +98,7 @@ public class DenseFixedStepBenchmarks
         };
 
     [Benchmark]
+    [BenchmarkCategory("SlotWindowResultConstruction")]
     public object ScalarMultiply() =>
         Implementation switch
         {
@@ -106,6 +109,7 @@ public class DenseFixedStepBenchmarks
         };
 
     [Benchmark]
+    [BenchmarkCategory("SlotWindowResultConstruction")]
     public object BinaryAdd() =>
         Implementation switch
         {
