@@ -147,9 +147,51 @@ public class GenericTimeSeriesTest
         series.ExplicitPointCount.Should().Be(3);
     }
 
+    [Fact]
+    public void SlotAdapters_ShouldPreserveSparseLifecycleWhenWindowExpandsInBothDirections()
+    {
+        var first = new DateTimeOffset(2022, 2, 6, 5, 0, 0, TimeSpan.Zero);
+        var left = first.AddMinutes(-5);
+        var missing = first.AddMinutes(5);
+        var last = first.AddMinutes(10);
+        var right = first.AddMinutes(15);
+
+        foreach (var series in CreateSlotSeries())
+        {
+            series[first] = 1;
+            series[last] = 3;
+            series[left] = 4;
+            series[right] = 5;
+
+            series.ExplicitPointCount.Should().Be(4);
+            series.MinDate.Should().Be(left);
+            series.MaxDate.Should().Be(right);
+            series.TryGetValue(missing, out _).Should().BeFalse();
+            series.GetPoints().Select(point => point.Timestamp).Should().Equal(left, first, last, right);
+
+            series.Remove(left).Should().BeTrue();
+            series.Remove(right).Should().BeTrue();
+            series.MinDate.Should().Be(first);
+            series.MaxDate.Should().Be(last);
+            series.ExplicitPointCount.Should().Be(2);
+
+            series.Clear();
+            series.ExplicitPointCount.Should().Be(0);
+            series.GetPoints().Should().BeEmpty();
+            FluentActions.Invoking(() => _ = series.MinDate)
+                .Should().Throw<InvalidOperationException>();
+        }
+    }
+
     private static ISparseTimeSeries<int>[] CreateSparseSeries() =>
     [
         new SortedArrayTimeSeries<int>(Period.FiveMinutes),
+        new FixedSlotTimeSeries<int>(Period.FiveMinutes),
+        new DynamicSlotTimeSeries<int>(Period.FiveMinutes)
+    ];
+
+    private static ISparseTimeSeries<int>[] CreateSlotSeries() =>
+    [
         new FixedSlotTimeSeries<int>(Period.FiveMinutes),
         new DynamicSlotTimeSeries<int>(Period.FiveMinutes)
     ];
