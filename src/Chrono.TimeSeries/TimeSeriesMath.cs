@@ -583,24 +583,15 @@ public static class TimeSeriesMath
 
     public static FixedSlotTimeSeries<T> Multiply<T>(FixedSlotTimeSeries<T> input, T scalar)
         where T : struct, INumber<T>
-    {
-        TimeSeriesOperationPolicy.EnsureExactConcreteAdapter(input, input.Period, TimeSeriesResultAdapter.FixedSlot);
-        return input.MultiplyScalar(scalar);
-    }
+        => TransformExactScalar(input, scalar, ScalarOperation.Multiply);
 
     public static FixedSlotTimeSeries<T> Add<T>(FixedSlotTimeSeries<T> input, T scalar)
         where T : struct, INumber<T>
-    {
-        TimeSeriesOperationPolicy.EnsureExactConcreteAdapter(input, input.Period, TimeSeriesResultAdapter.FixedSlot);
-        return input.AddScalar(scalar);
-    }
+        => TransformExactScalar(input, scalar, ScalarOperation.Add);
 
     public static FixedSlotTimeSeries<T> Divide<T>(FixedSlotTimeSeries<T> input, T scalar)
         where T : struct, INumber<T>
-    {
-        TimeSeriesOperationPolicy.EnsureExactConcreteAdapter(input, input.Period, TimeSeriesResultAdapter.FixedSlot);
-        return input.DivideScalar(scalar);
-    }
+        => TransformExactScalar(input, scalar, ScalarOperation.Divide);
 
     public static DynamicSlotTimeSeries<T> Add<T>(
         DynamicSlotTimeSeries<T> left,
@@ -644,24 +635,15 @@ public static class TimeSeriesMath
 
     public static DynamicSlotTimeSeries<T> Multiply<T>(DynamicSlotTimeSeries<T> input, T scalar)
         where T : struct, INumber<T>
-    {
-        TimeSeriesOperationPolicy.EnsureExactConcreteAdapter(input, input.Period, TimeSeriesResultAdapter.DynamicSlot);
-        return input.MultiplyScalar(scalar);
-    }
+        => TransformExactScalar(input, scalar, ScalarOperation.Multiply);
 
     public static DynamicSlotTimeSeries<T> Add<T>(DynamicSlotTimeSeries<T> input, T scalar)
         where T : struct, INumber<T>
-    {
-        TimeSeriesOperationPolicy.EnsureExactConcreteAdapter(input, input.Period, TimeSeriesResultAdapter.DynamicSlot);
-        return input.AddScalar(scalar);
-    }
+        => TransformExactScalar(input, scalar, ScalarOperation.Add);
 
     public static DynamicSlotTimeSeries<T> Divide<T>(DynamicSlotTimeSeries<T> input, T scalar)
         where T : struct, INumber<T>
-    {
-        TimeSeriesOperationPolicy.EnsureExactConcreteAdapter(input, input.Period, TimeSeriesResultAdapter.DynamicSlot);
-        return input.DivideScalar(scalar);
-    }
+        => TransformExactScalar(input, scalar, ScalarOperation.Divide);
 
     public static SortedArrayTimeSeries<T> Add<T>(
         SortedArrayTimeSeries<T> left,
@@ -705,41 +687,80 @@ public static class TimeSeriesMath
 
     public static SortedArrayTimeSeries<T> Multiply<T>(SortedArrayTimeSeries<T> source, T scalar)
         where T : struct, INumber<T>
-    {
-        TimeSeriesOperationPolicy.EnsureExactConcreteAdapter(source, source.Period, TimeSeriesResultAdapter.SortedArray);
-        var keys = source.TickKeys;
-        var values = source.Values;
-        var outKeys = keys.ToArray();
-        var outValues = new T[values.Length];
-
-        NumericSpanOperations<T>.Multiply(values, scalar, outValues);
-        return SortedArrayTimeSeries<T>.CreateFromSortedRaw(outKeys, outValues, source.Period);
-    }
+        => TransformExactScalar(source, scalar, ScalarOperation.Multiply);
 
     public static SortedArrayTimeSeries<T> Add<T>(SortedArrayTimeSeries<T> source, T scalar)
         where T : struct, INumber<T>
-    {
-        TimeSeriesOperationPolicy.EnsureExactConcreteAdapter(source, source.Period, TimeSeriesResultAdapter.SortedArray);
-        var keys = source.TickKeys;
-        var values = source.Values;
-        var outKeys = keys.ToArray();
-        var outValues = new T[values.Length];
-
-        NumericSpanOperations<T>.AddScalar(values, scalar, outValues);
-        return SortedArrayTimeSeries<T>.CreateFromSortedRaw(outKeys, outValues, source.Period);
-    }
+        => TransformExactScalar(source, scalar, ScalarOperation.Add);
 
     public static SortedArrayTimeSeries<T> Divide<T>(SortedArrayTimeSeries<T> source, T scalar)
         where T : struct, INumber<T>
-    {
-        TimeSeriesOperationPolicy.EnsureExactConcreteAdapter(source, source.Period, TimeSeriesResultAdapter.SortedArray);
-        var keys = source.TickKeys;
-        var values = source.Values;
-        var outKeys = keys.ToArray();
-        var outValues = new T[values.Length];
+        => TransformExactScalar(source, scalar, ScalarOperation.Divide);
 
-        NumericSpanOperations<T>.Divide(values, scalar, outValues);
-        return SortedArrayTimeSeries<T>.CreateFromSortedRaw(outKeys, outValues, source.Period);
+    private static FixedSlotTimeSeries<T> TransformExactScalar<T>(
+        FixedSlotTimeSeries<T> source,
+        T scalar,
+        ScalarOperation operation)
+        where T : struct, INumber<T>
+    {
+        TimeSeriesOperationPolicy.EnsureExactConcreteAdapter(
+            source, source.Period, TimeSeriesResultAdapter.FixedSlot);
+
+        return operation switch
+        {
+            ScalarOperation.Multiply => source.MultiplyScalar(scalar),
+            ScalarOperation.Add => source.AddScalar(scalar),
+            ScalarOperation.Divide => source.DivideScalar(scalar),
+            _ => throw new ArgumentOutOfRangeException(nameof(operation))
+        };
+    }
+
+    private static DynamicSlotTimeSeries<T> TransformExactScalar<T>(
+        DynamicSlotTimeSeries<T> source,
+        T scalar,
+        ScalarOperation operation)
+        where T : struct, INumber<T>
+    {
+        TimeSeriesOperationPolicy.EnsureExactConcreteAdapter(
+            source, source.Period, TimeSeriesResultAdapter.DynamicSlot);
+
+        return operation switch
+        {
+            ScalarOperation.Multiply => source.MultiplyScalar(scalar),
+            ScalarOperation.Add => source.AddScalar(scalar),
+            ScalarOperation.Divide => source.DivideScalar(scalar),
+            _ => throw new ArgumentOutOfRangeException(nameof(operation))
+        };
+    }
+
+    private static SortedArrayTimeSeries<T> TransformExactScalar<T>(
+        SortedArrayTimeSeries<T> source,
+        T scalar,
+        ScalarOperation operation)
+        where T : struct, INumber<T>
+    {
+        TimeSeriesOperationPolicy.EnsureExactConcreteAdapter(
+            source, source.Period, TimeSeriesResultAdapter.SortedArray);
+
+        var values = source.Values;
+        var outValues = new T[values.Length];
+        switch (operation)
+        {
+            case ScalarOperation.Multiply:
+                NumericSpanOperations<T>.Multiply(values, scalar, outValues);
+                break;
+            case ScalarOperation.Add:
+                NumericSpanOperations<T>.AddScalar(values, scalar, outValues);
+                break;
+            case ScalarOperation.Divide:
+                NumericSpanOperations<T>.Divide(values, scalar, outValues);
+                break;
+            default:
+                throw new ArgumentOutOfRangeException(nameof(operation));
+        }
+
+        return SortedArrayTimeSeries<T>.CreateFromSortedRaw(
+            source.TickKeys.ToArray(), outValues, source.Period);
     }
 
     private static FixedSlotTimeSeries<T> MergeRegular<T>(
@@ -1242,5 +1263,12 @@ public static class TimeSeriesMath
     private static void EnsureCompatible<T>(SortedArrayTimeSeries<T> left, SortedArrayTimeSeries<T> right)
         where T : struct, INumber<T>
         => TimeSeriesOperationPolicy.EnsureExactConcreteAdapter(left, right, TimeSeriesResultAdapter.SortedArray);
+
+    private enum ScalarOperation
+    {
+        Multiply,
+        Add,
+        Divide
+    }
 
 }

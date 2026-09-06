@@ -4,7 +4,7 @@ namespace Chrono.TimeSeries.Test;
 
 public class TimeSeriesOperationPolicyTest
 {
-    private static readonly PolicyCase[] FamilyTargetPeriodMatrix =
+    private static readonly PolicyCase[] _familyTargetPeriodMatrix =
     [
         new(TimeSeriesSemanticFamily.Sparse, TimeSeriesResultTarget.Compatibility, Period.Hour, TimeSeriesResultAdapter.SortedArray),
         new(TimeSeriesSemanticFamily.Sparse, TimeSeriesResultTarget.Compatibility, Period.Month, TimeSeriesResultAdapter.SortedArray),
@@ -49,7 +49,7 @@ public class TimeSeriesOperationPolicyTest
     [Fact]
     public void Decide_ShouldApplyTheSingleFamilyTargetPeriodMatrix()
     {
-        foreach (var testCase in FamilyTargetPeriodMatrix)
+        foreach (var testCase in _familyTargetPeriodMatrix)
         {
             var decision = TimeSeriesOperationPolicy.Decide(testCase.Family, testCase.Target, testCase.Period);
 
