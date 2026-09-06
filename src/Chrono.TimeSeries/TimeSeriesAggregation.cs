@@ -155,7 +155,7 @@ public static class TimeSeriesAggregation
         where TOut : struct, INumber<TOut>
         where TAggregator : struct, IAggregator<TIn, TOut>
     {
-        _ = TimeSeriesOperationPolicy.SelectExactConcreteAdapter(source);
+        TimeSeriesOperationPolicy.EnsureExactConcreteAdapter(source, targetPeriod, TimeSeriesResultAdapter.FixedSlot);
         if (source.ExplicitPointCount == 0)
             return new FixedSlotTimeSeries<TOut>(targetPeriod);
 
@@ -203,7 +203,7 @@ public static class TimeSeriesAggregation
         where TOut : struct, INumber<TOut>
         where TAggregator : struct, IAggregator<TIn, TOut>
     {
-        _ = TimeSeriesOperationPolicy.SelectExactConcreteAdapter(source);
+        TimeSeriesOperationPolicy.EnsureExactConcreteAdapter(source, targetPeriod, TimeSeriesResultAdapter.SortedArray);
         if (source.ExplicitPointCount == 0)
             return new SortedArrayTimeSeries<TOut>(targetPeriod);
 
@@ -279,9 +279,7 @@ public static class TimeSeriesAggregation
         where TOut : struct, INumber<TOut>
         where TAggregator : struct, IAggregator<TIn, TOut>
     {
-        _ = TimeSeriesOperationPolicy.SelectExactConcreteAdapter(source);
-        if (targetPeriod == Period.NonStandard)
-            throw new NotSupportedException($"Period {targetPeriod} is not supported.");
+        TimeSeriesOperationPolicy.EnsureExactConcreteAdapter(source, targetPeriod, TimeSeriesResultAdapter.DynamicSlot);
 
         if (source.ExplicitPointCount == 0)
             return new DynamicSlotTimeSeries<TOut>(targetPeriod);
@@ -330,7 +328,7 @@ public static class TimeSeriesAggregation
         where TOut : struct, INumber<TOut>
         where TAggregator : struct, IAggregator<TIn, TOut>
     {
-        _ = TimeSeriesOperationPolicy.SelectExactConcreteAdapter(source);
+        TimeSeriesOperationPolicy.EnsureExactConcreteAdapter(source, targetPeriod, TimeSeriesResultAdapter.BoundedStepwise);
         return AggregateStepwise<TIn, TOut, TAggregator>(source, targetPeriod, aggregator);
     }
 

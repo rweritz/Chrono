@@ -49,7 +49,8 @@ internal static class TimeSeriesOperationPolicy
         {
             TimeSeriesResultTarget.Compatibility => semanticFamily switch
             {
-                TimeSeriesSemanticFamily.BoundedStepwise => TimeSeriesResultAdapter.BoundedStepwise,
+                TimeSeriesSemanticFamily.BoundedStepwise when resultPeriod != Period.NonStandard =>
+                    TimeSeriesResultAdapter.BoundedStepwise,
                 TimeSeriesSemanticFamily.Sparse or TimeSeriesSemanticFamily.Mixed => TimeSeriesResultAdapter.SortedArray,
                 _ => TimeSeriesResultAdapter.None
             },
@@ -81,26 +82,58 @@ internal static class TimeSeriesOperationPolicy
         return Decide(Classify(left, right), TimeSeriesResultTarget.Compatibility, left.Period);
     }
 
-    public static TimeSeriesResultAdapter SelectExactConcreteAdapter<T>(IReadOnlyTimeSeries<T> source)
+    public static TimeSeriesResultAdapter SelectExactConcreteAdapter<T>(
+        IReadOnlyTimeSeries<T> source,
+        Period resultPeriod)
         where T : struct, INumber<T>
-        => source switch
+    {
+        var target = source switch
         {
-            FixedSlotTimeSeries<T> => TimeSeriesResultAdapter.FixedSlot,
-            DynamicSlotTimeSeries<T> => TimeSeriesResultAdapter.DynamicSlot,
-            SortedArrayTimeSeries<T> => TimeSeriesResultAdapter.SortedArray,
-            StepwiseTimeSeries<T> => TimeSeriesResultAdapter.BoundedStepwise,
-            _ => DecideCompatibility(source, source.Period).Adapter
+            FixedSlotTimeSeries<T> => TimeSeriesResultTarget.FixedSlot,
+            DynamicSlotTimeSeries<T> => TimeSeriesResultTarget.DynamicSlot,
+            SortedArrayTimeSeries<T> => TimeSeriesResultTarget.Compatibility,
+            StepwiseTimeSeries<T> => TimeSeriesResultTarget.BoundedStepwise,
+            _ => TimeSeriesResultTarget.Compatibility
         };
+
+        return Decide(Classify(source), target, resultPeriod).Adapter;
+    }
 
     public static TimeSeriesResultAdapter SelectExactConcreteAdapter<T>(
         IReadOnlyTimeSeries<T> left,
-        IReadOnlyTimeSeries<T> right)
+        IReadOnlyTimeSeries<T> right,
+        Period resultPeriod)
         where T : struct, INumber<T>
     {
         EnsurePeriodsMatch(left, right);
         return left.GetType() == right.GetType()
-            ? SelectExactConcreteAdapter(left)
-            : DecideCompatibility(left, right).Adapter;
+            ? SelectExactConcreteAdapter(left, resultPeriod)
+            : Decide(Classify(left, right), TimeSeriesResultTarget.Compatibility, resultPeriod).Adapter;
+    }
+
+    public static void EnsureExactConcreteAdapter<T>(
+        IReadOnlyTimeSeries<T> source,
+        Period resultPeriod,
+        TimeSeriesResultAdapter expectedAdapter)
+        where T : struct, INumber<T>
+    {
+        var selectedAdapter = SelectExactConcreteAdapter(source, resultPeriod);
+        if (selectedAdapter != expectedAdapter)
+        {
+            throw new NotSupportedException(
+                $"{source.GetType().Name} cannot produce a {expectedAdapter} result for period {resultPeriod}.");
+        }
+    }
+
+    public static void EnsureExactConcreteAdapter<T>(
+        IReadOnlyTimeSeries<T> left,
+        IReadOnlyTimeSeries<T> right,
+        TimeSeriesResultAdapter expectedAdapter)
+        where T : struct, INumber<T>
+    {
+        var selectedAdapter = SelectExactConcreteAdapter(left, right, left.Period);
+        if (selectedAdapter != expectedAdapter)
+            throw new NotSupportedException($"The exact concrete operands cannot produce a {expectedAdapter} result.");
     }
 
     public static TimeSeriesOperationDecision DecideSpecialization<T>(
@@ -178,21 +211,19 @@ internal static class TimeSeriesOperationPolicy
 
     public static DynamicSlotTimeSeries<T> ToDynamicSlotTimeSeries<T>(IReadOnlySparseTimeSeries<T> source)
         where T : struct, INumber<T>
-    {
-        var window = new SlotWindow<T>(source.ExplicitPointCount);
-        foreach (var point in source.GetPoints())
-            window.Set(PeriodGeometry.ToSlot(point.Timestamp, source.Period), point.Value);
-
-        return new DynamicSlotTimeSeries<T>(source.Period, AlignMode.Strict, window);
-    }
+        => new(source.Period, AlignMode.Strict, ToSlotWindow(source));
 
     public static FixedSlotTimeSeries<T> ToFixedSlotTimeSeries<T>(IReadOnlySparseTimeSeries<T> source)
+        where T : struct, INumber<T>
+        => new(source.Period, ToSlotWindow(source));
+
+    private static SlotWindow<T> ToSlotWindow<T>(IReadOnlySparseTimeSeries<T> source)
         where T : struct, INumber<T>
     {
         var window = new SlotWindow<T>(source.ExplicitPointCount);
         foreach (var point in source.GetPoints())
             window.Set(PeriodGeometry.ToSlot(point.Timestamp, source.Period), point.Value);
 
-        return new FixedSlotTimeSeries<T>(source.Period, window);
+        return window;
     }
 }

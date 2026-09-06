@@ -282,15 +282,24 @@ public static class TimeSeriesMath
 
     public static StepwiseTimeSeries<T> Multiply<T>(IBoundedStepwiseTimeSeries<T> source, T scalar)
         where T : struct, INumber<T>
-        => TransformStepwise(source, static (value, operand) => value * operand, scalar);
+    {
+        EnsureCompatibilityAdapter(source, TimeSeriesResultAdapter.BoundedStepwise);
+        return TransformStepwise(source, static (value, operand) => value * operand, scalar);
+    }
 
     public static StepwiseTimeSeries<T> Add<T>(IBoundedStepwiseTimeSeries<T> source, T scalar)
         where T : struct, INumber<T>
-        => TransformStepwise(source, static (value, operand) => value + operand, scalar);
+    {
+        EnsureCompatibilityAdapter(source, TimeSeriesResultAdapter.BoundedStepwise);
+        return TransformStepwise(source, static (value, operand) => value + operand, scalar);
+    }
 
     public static StepwiseTimeSeries<T> Divide<T>(IBoundedStepwiseTimeSeries<T> source, T scalar)
         where T : struct, INumber<T>
-        => TransformStepwise(source, static (value, operand) => value / operand, scalar);
+    {
+        EnsureCompatibilityAdapter(source, TimeSeriesResultAdapter.BoundedStepwise);
+        return TransformStepwise(source, static (value, operand) => value / operand, scalar);
+    }
 
     public static FixedSlotTimeSeries<T> Add<T>(
         FixedSlotTimeSeries<T> left,
@@ -574,15 +583,24 @@ public static class TimeSeriesMath
 
     public static FixedSlotTimeSeries<T> Multiply<T>(FixedSlotTimeSeries<T> input, T scalar)
         where T : struct, INumber<T>
-        => input.MultiplyScalar(scalar);
+    {
+        TimeSeriesOperationPolicy.EnsureExactConcreteAdapter(input, input.Period, TimeSeriesResultAdapter.FixedSlot);
+        return input.MultiplyScalar(scalar);
+    }
 
     public static FixedSlotTimeSeries<T> Add<T>(FixedSlotTimeSeries<T> input, T scalar)
         where T : struct, INumber<T>
-        => input.AddScalar(scalar);
+    {
+        TimeSeriesOperationPolicy.EnsureExactConcreteAdapter(input, input.Period, TimeSeriesResultAdapter.FixedSlot);
+        return input.AddScalar(scalar);
+    }
 
     public static FixedSlotTimeSeries<T> Divide<T>(FixedSlotTimeSeries<T> input, T scalar)
         where T : struct, INumber<T>
-        => input.DivideScalar(scalar);
+    {
+        TimeSeriesOperationPolicy.EnsureExactConcreteAdapter(input, input.Period, TimeSeriesResultAdapter.FixedSlot);
+        return input.DivideScalar(scalar);
+    }
 
     public static DynamicSlotTimeSeries<T> Add<T>(
         DynamicSlotTimeSeries<T> left,
@@ -626,15 +644,24 @@ public static class TimeSeriesMath
 
     public static DynamicSlotTimeSeries<T> Multiply<T>(DynamicSlotTimeSeries<T> input, T scalar)
         where T : struct, INumber<T>
-        => input.MultiplyScalar(scalar);
+    {
+        TimeSeriesOperationPolicy.EnsureExactConcreteAdapter(input, input.Period, TimeSeriesResultAdapter.DynamicSlot);
+        return input.MultiplyScalar(scalar);
+    }
 
     public static DynamicSlotTimeSeries<T> Add<T>(DynamicSlotTimeSeries<T> input, T scalar)
         where T : struct, INumber<T>
-        => input.AddScalar(scalar);
+    {
+        TimeSeriesOperationPolicy.EnsureExactConcreteAdapter(input, input.Period, TimeSeriesResultAdapter.DynamicSlot);
+        return input.AddScalar(scalar);
+    }
 
     public static DynamicSlotTimeSeries<T> Divide<T>(DynamicSlotTimeSeries<T> input, T scalar)
         where T : struct, INumber<T>
-        => input.DivideScalar(scalar);
+    {
+        TimeSeriesOperationPolicy.EnsureExactConcreteAdapter(input, input.Period, TimeSeriesResultAdapter.DynamicSlot);
+        return input.DivideScalar(scalar);
+    }
 
     public static SortedArrayTimeSeries<T> Add<T>(
         SortedArrayTimeSeries<T> left,
@@ -679,6 +706,7 @@ public static class TimeSeriesMath
     public static SortedArrayTimeSeries<T> Multiply<T>(SortedArrayTimeSeries<T> source, T scalar)
         where T : struct, INumber<T>
     {
+        TimeSeriesOperationPolicy.EnsureExactConcreteAdapter(source, source.Period, TimeSeriesResultAdapter.SortedArray);
         var keys = source.TickKeys;
         var values = source.Values;
         var outKeys = keys.ToArray();
@@ -691,6 +719,7 @@ public static class TimeSeriesMath
     public static SortedArrayTimeSeries<T> Add<T>(SortedArrayTimeSeries<T> source, T scalar)
         where T : struct, INumber<T>
     {
+        TimeSeriesOperationPolicy.EnsureExactConcreteAdapter(source, source.Period, TimeSeriesResultAdapter.SortedArray);
         var keys = source.TickKeys;
         var values = source.Values;
         var outKeys = keys.ToArray();
@@ -703,6 +732,7 @@ public static class TimeSeriesMath
     public static SortedArrayTimeSeries<T> Divide<T>(SortedArrayTimeSeries<T> source, T scalar)
         where T : struct, INumber<T>
     {
+        TimeSeriesOperationPolicy.EnsureExactConcreteAdapter(source, source.Period, TimeSeriesResultAdapter.SortedArray);
         var keys = source.TickKeys;
         var values = source.Values;
         var outKeys = keys.ToArray();
@@ -1181,18 +1211,36 @@ public static class TimeSeriesMath
 
     private static void EnsureCompatible<T>(IReadOnlyTimeSeries<T> left, IReadOnlyTimeSeries<T> right)
         where T : struct, INumber<T>
-        => _ = TimeSeriesOperationPolicy.DecideCompatibility(left, right);
+    {
+        var decision = TimeSeriesOperationPolicy.DecideCompatibility(left, right);
+        var expectedAdapter = decision.SemanticFamily == TimeSeriesSemanticFamily.BoundedStepwise
+            ? TimeSeriesResultAdapter.BoundedStepwise
+            : TimeSeriesResultAdapter.SortedArray;
+
+        if (decision.Adapter != expectedAdapter)
+            throw new NotSupportedException("The selected compatibility result cannot represent this operation.");
+    }
+
+    private static void EnsureCompatibilityAdapter<T>(
+        IReadOnlyTimeSeries<T> source,
+        TimeSeriesResultAdapter expectedAdapter)
+        where T : struct, INumber<T>
+    {
+        var decision = TimeSeriesOperationPolicy.DecideCompatibility(source, source.Period);
+        if (decision.Adapter != expectedAdapter)
+            throw new NotSupportedException("The selected compatibility result cannot represent this operation.");
+    }
 
     private static void EnsureCompatible<T>(FixedSlotTimeSeries<T> left, FixedSlotTimeSeries<T> right)
         where T : struct, INumber<T>
-        => _ = TimeSeriesOperationPolicy.SelectExactConcreteAdapter(left, right);
+        => TimeSeriesOperationPolicy.EnsureExactConcreteAdapter(left, right, TimeSeriesResultAdapter.FixedSlot);
 
     private static void EnsureCompatible<T>(DynamicSlotTimeSeries<T> left, DynamicSlotTimeSeries<T> right)
         where T : struct, INumber<T>
-        => _ = TimeSeriesOperationPolicy.SelectExactConcreteAdapter(left, right);
+        => TimeSeriesOperationPolicy.EnsureExactConcreteAdapter(left, right, TimeSeriesResultAdapter.DynamicSlot);
 
     private static void EnsureCompatible<T>(SortedArrayTimeSeries<T> left, SortedArrayTimeSeries<T> right)
         where T : struct, INumber<T>
-        => _ = TimeSeriesOperationPolicy.SelectExactConcreteAdapter(left, right);
+        => TimeSeriesOperationPolicy.EnsureExactConcreteAdapter(left, right, TimeSeriesResultAdapter.SortedArray);
 
 }
