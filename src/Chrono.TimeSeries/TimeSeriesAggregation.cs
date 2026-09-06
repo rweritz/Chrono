@@ -13,8 +13,7 @@ public static class TimeSeriesAggregation
         where TOut : struct, INumber<TOut>
         where TAggregator : struct, IAggregator<TIn, TOut>
         => TryAggregateAsSparseTarget<TIn, TOut, TAggregator, FixedSlotTimeSeries<TOut>>(source, targetPeriod,
-            TimeSeriesMath.TimeSeriesSpecializationTarget.FixedSlot,
-            static sparse => TimeSeriesMath.ToFixedSlotTimeSeries(sparse), out result, aggregator);
+            TimeSeriesResultTarget.FixedSlot, out result, aggregator);
 
     public static bool TryAggregateAsDynamicSlotTimeSeries<TIn, TOut, TAggregator>(
         IReadOnlyTimeSeries<TIn> source,
@@ -25,8 +24,7 @@ public static class TimeSeriesAggregation
         where TOut : struct, INumber<TOut>
         where TAggregator : struct, IAggregator<TIn, TOut>
         => TryAggregateAsSparseTarget<TIn, TOut, TAggregator, DynamicSlotTimeSeries<TOut>>(source, targetPeriod,
-            TimeSeriesMath.TimeSeriesSpecializationTarget.DynamicSlot,
-            static sparse => TimeSeriesMath.ToDynamicSlotTimeSeries(sparse), out result, aggregator);
+            TimeSeriesResultTarget.DynamicSlot, out result, aggregator);
 
     public static bool TryAggregateAsBoundedStepwiseTimeSeries<TIn, TOut, TAggregator>(
         IReadOnlyTimeSeries<TIn> source,
@@ -37,7 +35,7 @@ public static class TimeSeriesAggregation
         where TOut : struct, INumber<TOut>
         where TAggregator : struct, IAggregator<TIn, TOut>
     {
-        if (!TimeSeriesMath.TryValidateSpecialization(source, targetPeriod, TimeSeriesMath.TimeSeriesSpecializationTarget.BoundedStepwise))
+        if (!TimeSeriesOperationPolicy.DecideSpecialization(source, targetPeriod, TimeSeriesResultTarget.BoundedStepwise).IsValid)
         {
             result = null;
             return false;
@@ -76,11 +74,14 @@ public static class TimeSeriesAggregation
         where TOut : struct, INumber<TOut>
         where TAggregator : struct, IAggregator<TIn, TOut>
     {
+        var decision = TimeSeriesOperationPolicy.DecideCompatibility(source, targetPeriod);
         if (source.ExplicitPointCount == 0)
-            return new SortedArrayTimeSeries<TOut>(targetPeriod);
+            return TimeSeriesOperationPolicy.AdaptSparse(new SortedArrayTimeSeries<TOut>(targetPeriod), decision);
 
         var buckets = AggregateSparsePoints<TIn, TOut, TAggregator>(source.GetPoints(), targetPeriod, aggregator);
-        return SortedArrayTimeSeries<TOut>.CreateFromSortedRaw(buckets.Keys.AsSpan(), buckets.Values.AsSpan(), targetPeriod);
+        var sparse = SortedArrayTimeSeries<TOut>.CreateFromSortedRaw(
+            buckets.Keys.AsSpan(), buckets.Values.AsSpan(), targetPeriod);
+        return TimeSeriesOperationPolicy.AdaptSparse(sparse, decision);
     }
 
     public static IReadOnlySparseTimeSeries<T> Sum<T>(IReadOnlySparseTimeSeries<T> source, Period targetPeriod)
@@ -114,7 +115,13 @@ public static class TimeSeriesAggregation
         where TIn : struct, INumber<TIn>
         where TOut : struct, INumber<TOut>
         where TAggregator : struct, IAggregator<TIn, TOut>
-        => AggregateStepwise<TIn, TOut, TAggregator>(source, targetPeriod, aggregator);
+    {
+        var decision = TimeSeriesOperationPolicy.DecideCompatibility(source, targetPeriod);
+        if (decision.Adapter != TimeSeriesResultAdapter.BoundedStepwise)
+            throw new InvalidOperationException("Bounded stepwise aggregation requires a bounded stepwise result adapter.");
+
+        return AggregateStepwise<TIn, TOut, TAggregator>(source, targetPeriod, aggregator);
+    }
 
     public static IBoundedStepwiseTimeSeries<T> Sum<T>(IBoundedStepwiseTimeSeries<T> source, Period targetPeriod)
         where T : struct, INumber<T>
@@ -148,6 +155,7 @@ public static class TimeSeriesAggregation
         where TOut : struct, INumber<TOut>
         where TAggregator : struct, IAggregator<TIn, TOut>
     {
+        _ = TimeSeriesOperationPolicy.SelectExactConcreteAdapter(source);
         if (source.ExplicitPointCount == 0)
             return new FixedSlotTimeSeries<TOut>(targetPeriod);
 
@@ -195,6 +203,7 @@ public static class TimeSeriesAggregation
         where TOut : struct, INumber<TOut>
         where TAggregator : struct, IAggregator<TIn, TOut>
     {
+        _ = TimeSeriesOperationPolicy.SelectExactConcreteAdapter(source);
         if (source.ExplicitPointCount == 0)
             return new SortedArrayTimeSeries<TOut>(targetPeriod);
 
@@ -270,6 +279,7 @@ public static class TimeSeriesAggregation
         where TOut : struct, INumber<TOut>
         where TAggregator : struct, IAggregator<TIn, TOut>
     {
+        _ = TimeSeriesOperationPolicy.SelectExactConcreteAdapter(source);
         if (targetPeriod == Period.NonStandard)
             throw new NotSupportedException($"Period {targetPeriod} is not supported.");
 
@@ -319,7 +329,10 @@ public static class TimeSeriesAggregation
         where TIn : struct, INumber<TIn>
         where TOut : struct, INumber<TOut>
         where TAggregator : struct, IAggregator<TIn, TOut>
-        => AggregateStepwise<TIn, TOut, TAggregator>(source, targetPeriod, aggregator);
+    {
+        _ = TimeSeriesOperationPolicy.SelectExactConcreteAdapter(source);
+        return AggregateStepwise<TIn, TOut, TAggregator>(source, targetPeriod, aggregator);
+    }
 
     public static StepwiseTimeSeries<T> Sum<T>(StepwiseTimeSeries<T> source, Period targetPeriod)
         where T : struct, INumber<T>
@@ -348,8 +361,7 @@ public static class TimeSeriesAggregation
     private static bool TryAggregateAsSparseTarget<TIn, TOut, TAggregator, TResult>(
         IReadOnlyTimeSeries<TIn> source,
         Period targetPeriod,
-        TimeSeriesMath.TimeSeriesSpecializationTarget target,
-        Func<IReadOnlySparseTimeSeries<TOut>, TResult> converter,
+        TimeSeriesResultTarget target,
         out TResult? result,
         TAggregator aggregator = default)
         where TIn : struct, INumber<TIn>
@@ -357,13 +369,16 @@ public static class TimeSeriesAggregation
         where TAggregator : struct, IAggregator<TIn, TOut>
         where TResult : class, IReadOnlyTimeSeries<TOut>
     {
-        if (!TimeSeriesMath.TryValidateSpecialization(source, targetPeriod, target))
+        var decision = TimeSeriesOperationPolicy.DecideSpecialization(source, targetPeriod, target);
+        if (!decision.IsValid)
         {
             result = null;
             return false;
         }
 
-        result = converter(Aggregate<TIn, TOut, TAggregator>((IReadOnlySparseTimeSeries<TIn>)source, targetPeriod, aggregator));
+        var sparse = Aggregate<TIn, TOut, TAggregator>(
+            (IReadOnlySparseTimeSeries<TIn>)source, targetPeriod, aggregator);
+        result = (TResult)TimeSeriesOperationPolicy.AdaptSparse(sparse, decision);
         return true;
     }
 

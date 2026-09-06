@@ -20,8 +20,8 @@ public static class TimeSeriesMath
         out DynamicSlotTimeSeries<T>? result,
         MissingValuePolicy policy = MissingValuePolicy.Intersection)
         where T : struct, INumber<T>
-        => TryBinaryAsSparseTarget(left, right, policy, TimeSeriesSpecializationTarget.DynamicSlot, static (a, b) => a + b,
-            ToDynamicSlotTimeSeries, out result);
+        => TryBinaryAsSparseTarget(left, right, policy, TimeSeriesResultTarget.DynamicSlot,
+            static (a, b) => a + b, out result);
 
     public static bool TryAddAsFixedSlotTimeSeries<T>(
         IReadOnlyTimeSeries<T> left,
@@ -29,8 +29,8 @@ public static class TimeSeriesMath
         out FixedSlotTimeSeries<T>? result,
         MissingValuePolicy policy = MissingValuePolicy.Intersection)
         where T : struct, INumber<T>
-        => TryBinaryAsSparseTarget(left, right, policy, TimeSeriesSpecializationTarget.FixedSlot, static (a, b) => a + b,
-            ToFixedSlotTimeSeries, out result);
+        => TryBinaryAsSparseTarget(left, right, policy, TimeSeriesResultTarget.FixedSlot,
+            static (a, b) => a + b, out result);
 
     public static bool TryAddAsBoundedStepwiseTimeSeries<T>(
         IReadOnlyTimeSeries<T> left,
@@ -56,8 +56,8 @@ public static class TimeSeriesMath
         out FixedSlotTimeSeries<T>? result,
         MissingValuePolicy policy = MissingValuePolicy.Intersection)
         where T : struct, INumber<T>
-        => TryBinaryAsSparseTarget(left, right, policy, TimeSeriesSpecializationTarget.FixedSlot, static (a, b) => a - b,
-            ToFixedSlotTimeSeries, out result);
+        => TryBinaryAsSparseTarget(left, right, policy, TimeSeriesResultTarget.FixedSlot,
+            static (a, b) => a - b, out result);
 
     public static bool TrySubtractAsDynamicSlotTimeSeries<T>(
         IReadOnlyTimeSeries<T> left,
@@ -65,8 +65,8 @@ public static class TimeSeriesMath
         out DynamicSlotTimeSeries<T>? result,
         MissingValuePolicy policy = MissingValuePolicy.Intersection)
         where T : struct, INumber<T>
-        => TryBinaryAsSparseTarget(left, right, policy, TimeSeriesSpecializationTarget.DynamicSlot, static (a, b) => a - b,
-            ToDynamicSlotTimeSeries, out result);
+        => TryBinaryAsSparseTarget(left, right, policy, TimeSeriesResultTarget.DynamicSlot,
+            static (a, b) => a - b, out result);
 
     public static bool TrySubtractAsBoundedStepwiseTimeSeries<T>(
         IReadOnlyTimeSeries<T> left,
@@ -112,8 +112,8 @@ public static class TimeSeriesMath
         out FixedSlotTimeSeries<T>? result,
         MissingValuePolicy policy = MissingValuePolicy.Intersection)
         where T : struct, INumber<T>
-        => TryBinaryAsSparseTarget(left, right, policy, TimeSeriesSpecializationTarget.FixedSlot, static (a, b) => a * b,
-            ToFixedSlotTimeSeries, out result);
+        => TryBinaryAsSparseTarget(left, right, policy, TimeSeriesResultTarget.FixedSlot,
+            static (a, b) => a * b, out result);
 
     public static bool TryMultiplyAsDynamicSlotTimeSeries<T>(
         IReadOnlyTimeSeries<T> left,
@@ -121,8 +121,8 @@ public static class TimeSeriesMath
         out DynamicSlotTimeSeries<T>? result,
         MissingValuePolicy policy = MissingValuePolicy.Intersection)
         where T : struct, INumber<T>
-        => TryBinaryAsSparseTarget(left, right, policy, TimeSeriesSpecializationTarget.DynamicSlot, static (a, b) => a * b,
-            ToDynamicSlotTimeSeries, out result);
+        => TryBinaryAsSparseTarget(left, right, policy, TimeSeriesResultTarget.DynamicSlot,
+            static (a, b) => a * b, out result);
 
     public static bool TryMultiplyAsBoundedStepwiseTimeSeries<T>(
         IReadOnlyTimeSeries<T> left,
@@ -168,8 +168,8 @@ public static class TimeSeriesMath
         out FixedSlotTimeSeries<T>? result,
         MissingValuePolicy policy = MissingValuePolicy.Intersection)
         where T : struct, INumber<T>
-        => TryBinaryAsSparseTarget(left, right, policy, TimeSeriesSpecializationTarget.FixedSlot, static (a, b) => a / b,
-            ToFixedSlotTimeSeries, out result);
+        => TryBinaryAsSparseTarget(left, right, policy, TimeSeriesResultTarget.FixedSlot,
+            static (a, b) => a / b, out result);
 
     public static bool TryDivideAsDynamicSlotTimeSeries<T>(
         IReadOnlyTimeSeries<T> left,
@@ -177,8 +177,8 @@ public static class TimeSeriesMath
         out DynamicSlotTimeSeries<T>? result,
         MissingValuePolicy policy = MissingValuePolicy.Intersection)
         where T : struct, INumber<T>
-        => TryBinaryAsSparseTarget(left, right, policy, TimeSeriesSpecializationTarget.DynamicSlot, static (a, b) => a / b,
-            ToDynamicSlotTimeSeries, out result);
+        => TryBinaryAsSparseTarget(left, right, policy, TimeSeriesResultTarget.DynamicSlot,
+            static (a, b) => a / b, out result);
 
     public static bool TryDivideAsBoundedStepwiseTimeSeries<T>(
         IReadOnlyTimeSeries<T> left,
@@ -904,14 +904,20 @@ public static class TimeSeriesMath
         MissingValuePolicy policy,
         Func<T, T, T> op)
         where T : struct, INumber<T>
-        => MergeSparse(left, right, policy, op);
+    {
+        var decision = TimeSeriesOperationPolicy.DecideCompatibility(left, right);
+        return TimeSeriesOperationPolicy.AdaptSparse(MergeSparse(left, right, policy, op), decision);
+    }
 
     private static IReadOnlySparseTimeSeries<T> TransformSparseCompatibility<T>(
         IReadOnlySparseTimeSeries<T> source,
         Func<T, T, T> op,
         T operand)
         where T : struct, INumber<T>
-        => TransformSparse(source, op, operand);
+    {
+        var decision = TimeSeriesOperationPolicy.DecideCompatibility(source, source.Period);
+        return TimeSeriesOperationPolicy.AdaptSparse(TransformSparse(source, op, operand), decision);
+    }
 
     private static IReadOnlySparseTimeSeries<T> MergeSparseWithBoundedStepwise<T>(
         IReadOnlySparseTimeSeries<T> sparse,
@@ -936,7 +942,8 @@ public static class TimeSeriesMath
             points.Add(new TimeSeriesPoint<T>(point.Timestamp, op(point.Value, hasStepwise ? stepwiseValue : T.Zero)));
         }
 
-        return CreateSparseResult(sparse.Period, points);
+        var compatibility = TimeSeriesOperationPolicy.DecideCompatibility(sparse, stepwise);
+        return TimeSeriesOperationPolicy.AdaptSparse(CreateSparseResult(sparse.Period, points), compatibility);
     }
 
     private static IReadOnlySparseTimeSeries<T> MergeBoundedStepwiseWithSparse<T>(
@@ -962,7 +969,8 @@ public static class TimeSeriesMath
             points.Add(new TimeSeriesPoint<T>(point.Timestamp, op(hasStepwise ? stepwiseValue : T.Zero, point.Value)));
         }
 
-        return CreateSparseResult(stepwise.Period, points);
+        var compatibility = TimeSeriesOperationPolicy.DecideCompatibility(stepwise, sparse);
+        return TimeSeriesOperationPolicy.AdaptSparse(CreateSparseResult(stepwise.Period, points), compatibility);
     }
 
     private static StepwiseTimeSeries<T> MergeStepwise<T>(
@@ -1104,21 +1112,21 @@ public static class TimeSeriesMath
         IReadOnlyTimeSeries<T> left,
         IReadOnlyTimeSeries<T> right,
         MissingValuePolicy policy,
-        TimeSeriesSpecializationTarget target,
+        TimeSeriesResultTarget target,
         Func<T, T, T> op,
-        Func<IReadOnlySparseTimeSeries<T>, TResult> converter,
         out TResult? result)
         where T : struct, INumber<T>
         where TResult : class, IReadOnlyTimeSeries<T>
     {
-        EnsureCompatible(left, right);
-        if (!TryValidateBinarySpecialization(left, right, target))
+        var decision = TimeSeriesOperationPolicy.DecideSpecialization(left, right, target);
+        if (!decision.IsValid)
         {
             result = null;
             return false;
         }
 
-        result = converter(ExecuteSparseBinaryOperation(left, right, policy, op));
+        result = (TResult)TimeSeriesOperationPolicy.AdaptSparse(
+            ExecuteSparseBinaryOperation(left, right, policy, op), decision);
         return true;
     }
 
@@ -1130,8 +1138,8 @@ public static class TimeSeriesMath
         out StepwiseTimeSeries<T>? result)
         where T : struct, INumber<T>
     {
-        EnsureCompatible(left, right);
-        if (!TryValidateBinarySpecialization(left, right, TimeSeriesSpecializationTarget.BoundedStepwise))
+        var decision = TimeSeriesOperationPolicy.DecideSpecialization(left, right, TimeSeriesResultTarget.BoundedStepwise);
+        if (!decision.IsValid)
         {
             result = null;
             return false;
@@ -1171,118 +1179,20 @@ public static class TimeSeriesMath
         return MergeStepwise(stepwiseLeft, stepwiseRight, policy, op);
     }
 
-    internal static bool TryValidateSpecialization<T>(
-        IReadOnlyTimeSeries<T> source,
-        Period resultPeriod,
-        TimeSeriesSpecializationTarget target)
-        where T : struct, INumber<T>
-        => IsSemanticallyValidTarget(ClassifySemanticFamily(source), target, resultPeriod);
-
-    private static bool TryValidateBinarySpecialization<T>(
-        IReadOnlyTimeSeries<T> left,
-        IReadOnlyTimeSeries<T> right,
-        TimeSeriesSpecializationTarget target)
-        where T : struct, INumber<T>
-        => IsSemanticallyValidTarget(ClassifyBinarySemanticFamily(left, right), target, left.Period);
-
-    private static TimeSeriesSemanticFamily ClassifyBinarySemanticFamily<T>(IReadOnlyTimeSeries<T> left, IReadOnlyTimeSeries<T> right)
-        where T : struct, INumber<T>
-    {
-        var leftFamily = ClassifySemanticFamily(left);
-        var rightFamily = ClassifySemanticFamily(right);
-
-        if (leftFamily == TimeSeriesSemanticFamily.Sparse || rightFamily == TimeSeriesSemanticFamily.Sparse)
-            return TimeSeriesSemanticFamily.Sparse;
-
-        if (leftFamily == TimeSeriesSemanticFamily.BoundedStepwise && rightFamily == TimeSeriesSemanticFamily.BoundedStepwise)
-            return TimeSeriesSemanticFamily.BoundedStepwise;
-
-        throw new InvalidOperationException("Unsupported time series family combination.");
-    }
-
-    internal static DynamicSlotTimeSeries<T> ToDynamicSlotTimeSeries<T>(IReadOnlySparseTimeSeries<T> source)
-        where T : struct, INumber<T>
-    {
-        var window = new SlotWindow<T>(source.ExplicitPointCount);
-        foreach (var point in source.GetPoints())
-            window.Set(PeriodGeometry.ToSlot(point.Timestamp, source.Period), point.Value);
-
-        return new DynamicSlotTimeSeries<T>(source.Period, AlignMode.Strict, window);
-    }
-
-    internal static FixedSlotTimeSeries<T> ToFixedSlotTimeSeries<T>(IReadOnlySparseTimeSeries<T> source)
-        where T : struct, INumber<T>
-    {
-        var window = new SlotWindow<T>(source.ExplicitPointCount);
-        foreach (var point in source.GetPoints())
-            window.Set(PeriodGeometry.ToSlot(point.Timestamp, source.Period), point.Value);
-
-        return new FixedSlotTimeSeries<T>(source.Period, window);
-    }
-
-    private static TimeSeriesSemanticFamily ClassifySemanticFamily<T>(IReadOnlyTimeSeries<T> source)
-        where T : struct, INumber<T>
-        => source switch
-        {
-            IReadOnlySparseTimeSeries<T> => TimeSeriesSemanticFamily.Sparse,
-            IBoundedStepwiseTimeSeries<T> => TimeSeriesSemanticFamily.BoundedStepwise,
-            _ => throw new InvalidOperationException("Unsupported time series family.")
-        };
-
-    private static bool IsSemanticallyValidTarget(
-        TimeSeriesSemanticFamily semanticFamily,
-        TimeSeriesSpecializationTarget target,
-        Period resultPeriod)
-        => target switch
-        {
-            TimeSeriesSpecializationTarget.FixedSlot =>
-                semanticFamily == TimeSeriesSemanticFamily.Sparse &&
-                PeriodGeometry.TryGetFixedTicks(resultPeriod, out _),
-            TimeSeriesSpecializationTarget.DynamicSlot =>
-                semanticFamily == TimeSeriesSemanticFamily.Sparse,
-            TimeSeriesSpecializationTarget.BoundedStepwise =>
-                semanticFamily == TimeSeriesSemanticFamily.BoundedStepwise,
-            _ => false
-        };
-
     private static void EnsureCompatible<T>(IReadOnlyTimeSeries<T> left, IReadOnlyTimeSeries<T> right)
         where T : struct, INumber<T>
-    {
-        if (left.Period != right.Period)
-            throw new InvalidOperationException("Periods must match.");
-    }
+        => _ = TimeSeriesOperationPolicy.DecideCompatibility(left, right);
 
     private static void EnsureCompatible<T>(FixedSlotTimeSeries<T> left, FixedSlotTimeSeries<T> right)
         where T : struct, INumber<T>
-    {
-        if (left.Period != right.Period)
-            throw new InvalidOperationException("Series periods must match.");
-    }
+        => _ = TimeSeriesOperationPolicy.SelectExactConcreteAdapter(left, right);
 
     private static void EnsureCompatible<T>(DynamicSlotTimeSeries<T> left, DynamicSlotTimeSeries<T> right)
         where T : struct, INumber<T>
-    {
-        if (left.Period != right.Period)
-            throw new InvalidOperationException("Series periods must match.");
-    }
+        => _ = TimeSeriesOperationPolicy.SelectExactConcreteAdapter(left, right);
 
     private static void EnsureCompatible<T>(SortedArrayTimeSeries<T> left, SortedArrayTimeSeries<T> right)
         where T : struct, INumber<T>
-    {
-        if (left.Period != right.Period)
-            throw new InvalidOperationException("Series periods must match.");
-    }
+        => _ = TimeSeriesOperationPolicy.SelectExactConcreteAdapter(left, right);
 
-    internal enum TimeSeriesSpecializationTarget
-    {
-        FixedSlot,
-        DynamicSlot,
-        BoundedStepwise
-    }
-
-    private enum TimeSeriesSemanticFamily
-    {
-        Sparse,
-        BoundedStepwise
-    }
 }
