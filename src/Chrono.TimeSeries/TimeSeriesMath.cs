@@ -583,15 +583,15 @@ public static class TimeSeriesMath
 
     public static FixedSlotTimeSeries<T> Multiply<T>(FixedSlotTimeSeries<T> input, T scalar)
         where T : struct, INumber<T>
-        => TransformExactScalar(input, scalar, ScalarOperation.Multiply);
+        => TransformExactScalar(input, scalar, static (source, operand) => source.MultiplyScalar(operand));
 
     public static FixedSlotTimeSeries<T> Add<T>(FixedSlotTimeSeries<T> input, T scalar)
         where T : struct, INumber<T>
-        => TransformExactScalar(input, scalar, ScalarOperation.Add);
+        => TransformExactScalar(input, scalar, static (source, operand) => source.AddScalar(operand));
 
     public static FixedSlotTimeSeries<T> Divide<T>(FixedSlotTimeSeries<T> input, T scalar)
         where T : struct, INumber<T>
-        => TransformExactScalar(input, scalar, ScalarOperation.Divide);
+        => TransformExactScalar(input, scalar, static (source, operand) => source.DivideScalar(operand));
 
     public static DynamicSlotTimeSeries<T> Add<T>(
         DynamicSlotTimeSeries<T> left,
@@ -635,15 +635,15 @@ public static class TimeSeriesMath
 
     public static DynamicSlotTimeSeries<T> Multiply<T>(DynamicSlotTimeSeries<T> input, T scalar)
         where T : struct, INumber<T>
-        => TransformExactScalar(input, scalar, ScalarOperation.Multiply);
+        => TransformExactScalar(input, scalar, static (source, operand) => source.MultiplyScalar(operand));
 
     public static DynamicSlotTimeSeries<T> Add<T>(DynamicSlotTimeSeries<T> input, T scalar)
         where T : struct, INumber<T>
-        => TransformExactScalar(input, scalar, ScalarOperation.Add);
+        => TransformExactScalar(input, scalar, static (source, operand) => source.AddScalar(operand));
 
     public static DynamicSlotTimeSeries<T> Divide<T>(DynamicSlotTimeSeries<T> input, T scalar)
         where T : struct, INumber<T>
-        => TransformExactScalar(input, scalar, ScalarOperation.Divide);
+        => TransformExactScalar(input, scalar, static (source, operand) => source.DivideScalar(operand));
 
     public static SortedArrayTimeSeries<T> Add<T>(
         SortedArrayTimeSeries<T> left,
@@ -687,56 +687,44 @@ public static class TimeSeriesMath
 
     public static SortedArrayTimeSeries<T> Multiply<T>(SortedArrayTimeSeries<T> source, T scalar)
         where T : struct, INumber<T>
-        => TransformExactScalar(source, scalar, ScalarOperation.Multiply);
+        => TransformExactScalar(source, scalar, NumericSpanOperations<T>.Multiply);
 
     public static SortedArrayTimeSeries<T> Add<T>(SortedArrayTimeSeries<T> source, T scalar)
         where T : struct, INumber<T>
-        => TransformExactScalar(source, scalar, ScalarOperation.Add);
+        => TransformExactScalar(source, scalar, NumericSpanOperations<T>.AddScalar);
 
     public static SortedArrayTimeSeries<T> Divide<T>(SortedArrayTimeSeries<T> source, T scalar)
         where T : struct, INumber<T>
-        => TransformExactScalar(source, scalar, ScalarOperation.Divide);
+        => TransformExactScalar(source, scalar, NumericSpanOperations<T>.Divide);
 
     private static FixedSlotTimeSeries<T> TransformExactScalar<T>(
         FixedSlotTimeSeries<T> source,
         T scalar,
-        ScalarOperation operation)
+        Func<FixedSlotTimeSeries<T>, T, FixedSlotTimeSeries<T>> transform)
         where T : struct, INumber<T>
     {
         TimeSeriesOperationPolicy.EnsureExactConcreteAdapter(
             source, source.Period, TimeSeriesResultAdapter.FixedSlot);
 
-        return operation switch
-        {
-            ScalarOperation.Multiply => source.MultiplyScalar(scalar),
-            ScalarOperation.Add => source.AddScalar(scalar),
-            ScalarOperation.Divide => source.DivideScalar(scalar),
-            _ => throw new ArgumentOutOfRangeException(nameof(operation))
-        };
+        return transform(source, scalar);
     }
 
     private static DynamicSlotTimeSeries<T> TransformExactScalar<T>(
         DynamicSlotTimeSeries<T> source,
         T scalar,
-        ScalarOperation operation)
+        Func<DynamicSlotTimeSeries<T>, T, DynamicSlotTimeSeries<T>> transform)
         where T : struct, INumber<T>
     {
         TimeSeriesOperationPolicy.EnsureExactConcreteAdapter(
             source, source.Period, TimeSeriesResultAdapter.DynamicSlot);
 
-        return operation switch
-        {
-            ScalarOperation.Multiply => source.MultiplyScalar(scalar),
-            ScalarOperation.Add => source.AddScalar(scalar),
-            ScalarOperation.Divide => source.DivideScalar(scalar),
-            _ => throw new ArgumentOutOfRangeException(nameof(operation))
-        };
+        return transform(source, scalar);
     }
 
     private static SortedArrayTimeSeries<T> TransformExactScalar<T>(
         SortedArrayTimeSeries<T> source,
         T scalar,
-        ScalarOperation operation)
+        SpanScalarTransform<T> transform)
         where T : struct, INumber<T>
     {
         TimeSeriesOperationPolicy.EnsureExactConcreteAdapter(
@@ -744,20 +732,7 @@ public static class TimeSeriesMath
 
         var values = source.Values;
         var outValues = new T[values.Length];
-        switch (operation)
-        {
-            case ScalarOperation.Multiply:
-                NumericSpanOperations<T>.Multiply(values, scalar, outValues);
-                break;
-            case ScalarOperation.Add:
-                NumericSpanOperations<T>.AddScalar(values, scalar, outValues);
-                break;
-            case ScalarOperation.Divide:
-                NumericSpanOperations<T>.Divide(values, scalar, outValues);
-                break;
-            default:
-                throw new ArgumentOutOfRangeException(nameof(operation));
-        }
+        transform(values, scalar, outValues);
 
         return SortedArrayTimeSeries<T>.CreateFromSortedRaw(
             source.TickKeys.ToArray(), outValues, source.Period);
@@ -1264,11 +1239,7 @@ public static class TimeSeriesMath
         where T : struct, INumber<T>
         => TimeSeriesOperationPolicy.EnsureExactConcreteAdapter(left, right, TimeSeriesResultAdapter.SortedArray);
 
-    private enum ScalarOperation
-    {
-        Multiply,
-        Add,
-        Divide
-    }
+    private delegate void SpanScalarTransform<T>(ReadOnlySpan<T> source, T scalar, Span<T> destination)
+        where T : struct, INumber<T>;
 
 }
